@@ -3,8 +3,8 @@ node_modules/
 
 .nuxt/
 .output/
-.vitepress/cache/
-.vitepress/dist/
+**/.vitepress/cache/
+**/.vitepress/dist/
 
 .DS_Store
 *.log
