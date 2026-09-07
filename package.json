@@ -1,0 +1,17 @@
+{
+  "name": "m2oath-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.26.0",
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "dev:web": "pnpm --filter @m2oath/web dev",
+    "dev:developer": "pnpm --filter @m2oath/developer dev",
+    "dev:agent": "pnpm --filter @m2oath/agent-web dev",
+    "dev:docs": "pnpm --filter @m2oath/docs dev"
+  }
+}

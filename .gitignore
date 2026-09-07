@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+
+.nuxt/
+.output/
+.vitepress/cache/
+.vitepress/dist/
+
+.DS_Store
+*.log
+
+.env
+.env.*
+!.env.example
