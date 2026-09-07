@@ -1,0 +1,69 @@
+import type { ControlPlaneClient } from './control-plane-client.js'
+import type {
+  AgentSummary,
+  RegisterAgentRequest,
+  RegisterAgentResponse
+} from './types.js'
+
+export interface HttpControlPlaneClientOptions {
+  baseUrl: string
+  fetch?: typeof globalThis.fetch
+}
+
+export class HttpControlPlaneClient implements ControlPlaneClient {
+  private readonly baseUrl: string
+  private readonly fetch: typeof globalThis.fetch
+
+  constructor(options: HttpControlPlaneClientOptions) {
+    this.baseUrl = options.baseUrl.replace(/\/$/, '')
+    this.fetch = options.fetch ?? globalThis.fetch
+  }
+
+  async registerAgent(
+    request: RegisterAgentRequest
+  ): Promise<RegisterAgentResponse> {
+    return this.request<RegisterAgentResponse>('/v1/agents', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    })
+  }
+
+  async getAgent(agentId: string): Promise<AgentSummary> {
+    return this.request<AgentSummary>(
+      `/v1/agents/${encodeURIComponent(agentId)}`
+    )
+  }
+
+  async listAgents(): Promise<AgentSummary[]> {
+    return this.request<AgentSummary[]>('/v1/agents')
+  }
+
+  private async request<T>(
+    path: string,
+    init?: RequestInit
+  ): Promise<T> {
+    const response = await this.fetch(`${this.baseUrl}${path}`, init)
+
+    if (!response.ok) {
+      throw new ControlPlaneHttpError(
+        response.status,
+        response.statusText
+      )
+    }
+
+    return await response.json() as T
+  }
+}
+
+export class ControlPlaneHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string
+  ) {
+    super(`M2Oath control-plane request failed: ${status} ${statusText}`)
+    this.name = 'ControlPlaneHttpError'
+  }
+}
