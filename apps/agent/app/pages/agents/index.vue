@@ -1,6 +1,19 @@
 <script setup lang="ts">
+import type {
+  AgentSummary
+} from '@m2oath/control-plane-client'
+
 useSeoMeta({
   title: 'Agents'
+})
+
+const {
+  data: agents,
+  status,
+  error,
+  refresh
+} = await useFetch<AgentSummary[]>('/api/agents', {
+  default: () => []
 })
 </script>
 
@@ -12,16 +25,77 @@ useSeoMeta({
       </h1>
 
       <p class="mt-4 text-muted">
-        Registered agents will appear here once the shared control-plane API
-        is connected.
+        Agents registered through the M2Oath control plane.
       </p>
 
-      <UAlert
+      <div
+        v-if="status === 'pending'"
         class="mt-8"
-        title="No agent data connected"
-        description="This route is present, but authoritative agent data has not been wired in yet."
+      >
+        <p class="text-muted">
+          Loading agents...
+        </p>
+      </div>
+
+      <UAlert
+        v-else-if="error"
+        class="mt-8"
+        color="error"
+        title="Unable to load agents"
+        description="The Agent application could not retrieve authoritative agent data from the M2Oath control plane."
+        icon="i-lucide-circle-alert"
+      >
+        <template #actions>
+          <UButton
+            size="sm"
+            variant="soft"
+            @click="refresh()"
+          >
+            Retry
+          </UButton>
+        </template>
+      </UAlert>
+
+      <UAlert
+        v-else-if="agents.length === 0"
+        class="mt-8"
+        title="No registered agents"
+        description="Register an agent through the M2Oath Developer application first."
         icon="i-lucide-info"
       />
+
+      <div
+        v-else
+        class="mt-8 space-y-4"
+      >
+        <UCard
+          v-for="agent in agents"
+          :key="agent.agentId"
+        >
+          <div class="flex items-center justify-between gap-6">
+            <div>
+              <p class="font-semibold">
+                {{ agent.displayName || agent.agentId }}
+              </p>
+
+              <p class="mt-1 font-mono text-sm text-muted">
+                {{ agent.agentId }}
+              </p>
+
+              <p class="mt-2 text-sm text-muted">
+                Status: {{ agent.status }}
+              </p>
+            </div>
+
+            <UButton
+              :to="`/agents/${encodeURIComponent(agent.agentId)}`"
+              variant="soft"
+            >
+              View Agent
+            </UButton>
+          </div>
+        </UCard>
+      </div>
     </div>
   </UContainer>
 </template>
