@@ -7,9 +7,15 @@ import type {
   RegisterAgentRequest
 } from '@m2oath/control-plane-client'
 import type {
+  AuthenticationRequest
+} from '@m2oath/agent'
+import type {
   AgentDirectory,
   AgentRegistrationGateway
 } from './agent-store.js'
+import {
+  AgentRegistrationError
+} from './agent-registration-error.js'
 
 export interface CreateControlPlaneServerOptions {
   registrationGateway: AgentRegistrationGateway
@@ -51,14 +57,51 @@ async function handleRequest(
   }
 
   if (method === 'POST' && url.pathname === '/v1/agents') {
-    const body = await readJsonBody<RegisterAgentRequest>(request)
+    const authentication =
+      getBearerAuthenticationRequest(request)
 
-    const agent =
-      await options.registrationGateway.registerAgent(body)
+    if (!authentication) {
+      sendJson(response, 401, {
+        error: 'developer-authentication-required'
+      })
+      return
+    }
 
-    sendJson(response, 201, {
-      agent
-    })
+    const body =
+      await readJsonBody<RegisterAgentRequest>(request)
+
+    try {
+      const agent =
+        await options.registrationGateway.registerAgent(
+          body,
+          authentication
+        )
+
+      sendJson(response, 201, {
+        agent
+      })
+    } catch (error) {
+      if (
+        error instanceof AgentRegistrationError
+      ) {
+        if (error.stage === 'authentication') {
+          sendJson(response, 401, {
+            error: 'developer-authentication-failed'
+          })
+          return
+        }
+
+        if (error.stage === 'authorization') {
+          sendJson(response, 403, {
+            error: 'developer-not-authorized'
+          })
+          return
+        }
+      }
+
+      throw error
+    }
+
     return
   }
 
@@ -74,9 +117,11 @@ async function handleRequest(
     const encodedAgentId =
       url.pathname.slice('/v1/agents/'.length)
 
-    const agentId = decodeURIComponent(encodedAgentId)
+    const agentId =
+      decodeURIComponent(encodedAgentId)
 
-    const agent = options.directory.getAgent(agentId)
+    const agent =
+      options.directory.getAgent(agentId)
 
     if (!agent) {
       sendJson(response, 404, {
@@ -92,6 +137,35 @@ async function handleRequest(
   sendJson(response, 404, {
     error: 'not-found'
   })
+}
+
+function getBearerAuthenticationRequest(
+  request: IncomingMessage
+): AuthenticationRequest | undefined {
+  const authorization =
+    request.headers.authorization?.trim()
+
+  if (!authorization) {
+    return undefined
+  }
+
+  const match =
+    /^Bearer\s+(.+)$/i.exec(authorization)
+
+  if (!match) {
+    return undefined
+  }
+
+  const credential =
+    match[1]?.trim()
+
+  if (!credential) {
+    return undefined
+  }
+
+  return {
+    credential
+  }
 }
 
 async function readJsonBody<T>(

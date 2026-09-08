@@ -12,16 +12,21 @@ import type {
   AgentDirectoryWriter,
   AgentRegistrationGateway
 } from './agent-store.js'
+import {
+  AgentRegistrationError
+} from './agent-registration-error.js'
 
 export interface M2OathAgentRegistrationGatewayOptions {
   sdk: M2OathSdk
   directory: AgentDirectoryWriter
-  authentication: AuthenticationRequest
 }
 
 /**
  * Hosted adapter from the control-plane registration contract to the
  * authoritative M2Oath lifecycle SDK.
+ *
+ * Authentication is request-scoped. The gateway never owns or caches
+ * caller credentials.
  *
  * This class never manufactures a canonical Agent ID.
  */
@@ -34,12 +39,12 @@ export class M2OathAgentRegistrationGateway
   ) {}
 
   async registerAgent(
-    request: RegisterAgentRequest
+    request: RegisterAgentRequest,
+    authentication: AuthenticationRequest
   ): Promise<AgentSummary> {
     const result =
       await this.options.sdk.registerAgent({
-        authentication:
-          this.options.authentication,
+        authentication,
 
         enrollment: {
           displayName:
@@ -60,8 +65,9 @@ export class M2OathAgentRegistrationGateway
       })
 
     if (!result.ok) {
-      throw new Error(
-        `agent-registration-${result.stage}-failed:${result.reason}`
+      throw new AgentRegistrationError(
+        result.stage,
+        result.reason
       )
     }
 

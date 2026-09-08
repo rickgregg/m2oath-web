@@ -246,6 +246,9 @@ importers:
       '@m2oath/agent':
         specifier: file:../../../m2oath-agent/packages/agent
         version: file:../m2oath-agent/packages/agent
+      '@m2oath/auth-jwt':
+        specifier: file:../../../m2oath-agent/packages/auth-jwt
+        version: file:../m2oath-agent/packages/auth-jwt(@m2oath/agent@file:../m2oath-agent/packages/agent)
       '@m2oath/control-plane-client':
         specifier: workspace:*
         version: link:../../packages/control-plane-client
@@ -259,6 +262,9 @@ importers:
       '@types/node':
         specifier: ^26.4.1
         version: 26.4.1
+      jose:
+        specifier: ^6.2.11
+        version: 6.2.12
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1258,6 +1264,11 @@ packages:
 
   '@m2oath/agent@file:../m2oath-agent/packages/agent':
     resolution: {directory: ../m2oath-agent/packages/agent, type: directory}
+
+  '@m2oath/auth-jwt@file:../m2oath-agent/packages/auth-jwt':
+    resolution: {directory: ../m2oath-agent/packages/auth-jwt, type: directory}
+    peerDependencies:
+      '@m2oath/agent': ^0.1.0
 
   '@m2oath/persistence@file:../m2oath-agent/packages/persistence':
     resolution: {directory: ../m2oath-agent/packages/persistence, type: directory}
@@ -4105,6 +4116,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -6986,6 +7000,11 @@ snapshots:
   '@kwsites/promise-deferred@1.1.1': {}
 
   '@m2oath/agent@file:../m2oath-agent/packages/agent': {}
+
+  '@m2oath/auth-jwt@file:../m2oath-agent/packages/auth-jwt(@m2oath/agent@file:../m2oath-agent/packages/agent)':
+    dependencies:
+      '@m2oath/agent': file:../m2oath-agent/packages/agent
+      jose: 6.2.12
 
   '@m2oath/persistence@file:../m2oath-agent/packages/persistence(@m2oath/agent@file:../m2oath-agent/packages/agent)':
     dependencies:
@@ -10432,6 +10451,8 @@ snapshots:
       '@pkgjs/parseargs': 0.11.0
 
   jiti@2.7.0: {}
+
+  jose@6.2.12: {}
 
   js-tokens@10.0.0: {}
 

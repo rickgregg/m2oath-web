@@ -12,12 +12,14 @@
   },
   "dependencies": {
     "@m2oath/agent": "file:../../../m2oath-agent/packages/agent",
+    "@m2oath/auth-jwt": "file:../../../m2oath-agent/packages/auth-jwt",
     "@m2oath/control-plane-client": "workspace:*",
     "@m2oath/persistence": "file:../../../m2oath-agent/packages/persistence",
     "@m2oath/sdk": "file:../../../m2oath-agent/packages/sdk"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
+    "jose": "^6.2.11",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   }

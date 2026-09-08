@@ -12,6 +12,11 @@ import {
 import {
   createControlPlaneServer
 } from '../src/server.js'
+import {
+  createTestM2OathAuthenticationOptions,
+  TEST_DEVELOPER_TOKEN,
+  TEST_UNAUTHORIZED_DEVELOPER_TOKEN
+} from './test-developer-authentication.js'
 
 const servers: ReturnType<typeof createControlPlaneServer>[] = []
 
@@ -38,13 +43,14 @@ async function startServer() {
       new InMemoryAgentDirectory()
 
     const m2oath =
-      createM2OathHostedComposition()
+      createM2OathHostedComposition(
+        createTestM2OathAuthenticationOptions()
+      )
 
     const registrationGateway =
       new M2OathAgentRegistrationGateway({
         sdk: m2oath.sdk,
-        directory,
-        authentication: {}
+        directory
       })
 
     return createControlPlaneServer({
@@ -66,6 +72,13 @@ async function startServer() {
   }
 }
 
+function registrationHeaders() {
+  return {
+    'content-type': 'application/json',
+    authorization: `Bearer ${TEST_DEVELOPER_TOKEN}`
+  }
+}
+
 describe('M2Oath control-plane API', () => {
   it('reports health', async () => {
     const { baseUrl } = await startServer()
@@ -78,7 +91,7 @@ describe('M2Oath control-plane API', () => {
     })
   })
 
-  it('registers an agent and issues the canonical agent id server-side', async () => {
+  it('fails closed when developer authentication is missing', async () => {
     const { baseUrl } = await startServer()
 
     const response = await fetch(`${baseUrl}/v1/agents`, {
@@ -86,6 +99,80 @@ describe('M2Oath control-plane API', () => {
       headers: {
         'content-type': 'application/json'
       },
+      body: JSON.stringify({
+        displayName: 'Weather Agent',
+        identifier: {
+          type: 'runtime-jwt',
+          value: 'weather-agent-runtime',
+          issuer: 'https://issuer.example'
+        }
+      })
+    })
+
+    expect(response.status).toBe(401)
+
+    expect(await response.json()).toEqual({
+      error: 'developer-authentication-required'
+    })
+  })
+
+  it('returns 401 when the presented Developer credential fails authentication', async () => {
+    const { baseUrl } = await startServer()
+
+    const response = await fetch(`${baseUrl}/v1/agents`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer invalid-development-token'
+      },
+      body: JSON.stringify({
+        displayName: 'Rejected Agent',
+        identifier: {
+          type: 'runtime-jwt',
+          value: 'rejected-runtime'
+        }
+      })
+    })
+
+    expect(response.status).toBe(401)
+
+    expect(await response.json()).toEqual({
+      error: 'developer-authentication-failed'
+    })
+  })
+
+  it('returns 403 when the authenticated Developer lacks agent.create authority', async () => {
+    const { baseUrl } = await startServer()
+
+    const response = await fetch(`${baseUrl}/v1/agents`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization:
+          `Bearer ${TEST_UNAUTHORIZED_DEVELOPER_TOKEN}`
+      },
+      body: JSON.stringify({
+        displayName: 'Unauthorized Agent',
+        identifier: {
+          type: 'runtime-jwt',
+          value: 'unauthorized-runtime'
+        }
+      })
+    })
+
+    expect(response.status).toBe(403)
+
+    expect(await response.json()).toEqual({
+      error: 'developer-not-authorized'
+    })
+  })
+
+  it('registers an agent and issues the canonical agent id server-side', async () => {
+    const { baseUrl } = await startServer()
+
+    const response = await fetch(`${baseUrl}/v1/agents`, {
+      method: 'POST',
+      headers: registrationHeaders(),
       body: JSON.stringify({
         displayName: 'Weather Agent',
         identifier: {
@@ -116,9 +203,7 @@ describe('M2Oath control-plane API', () => {
 
     await fetch(`${baseUrl}/v1/agents`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json'
-      },
+      headers: registrationHeaders(),
       body: JSON.stringify({
         displayName: 'Agent One',
         identifier: {
@@ -131,9 +216,7 @@ describe('M2Oath control-plane API', () => {
 
     await fetch(`${baseUrl}/v1/agents`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json'
-      },
+      headers: registrationHeaders(),
       body: JSON.stringify({
         displayName: 'Agent Two',
         identifier: {
@@ -177,9 +260,7 @@ describe('M2Oath control-plane API', () => {
     const registrationResponse =
       await fetch(`${baseUrl}/v1/agents`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json'
-        },
+        headers: registrationHeaders(),
         body: JSON.stringify({
           displayName: 'Weather Agent',
           identifier: {

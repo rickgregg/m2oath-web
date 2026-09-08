@@ -15,6 +15,10 @@ import {
 import {
   createControlPlaneServer
 } from '../src/server.js'
+import {
+  createTestM2OathAuthenticationOptions,
+  TEST_DEVELOPER_TOKEN
+} from './test-developer-authentication.js'
 
 const servers: ReturnType<typeof createControlPlaneServer>[] = []
 
@@ -41,13 +45,14 @@ async function startControlPlane() {
       new InMemoryAgentDirectory()
 
     const m2oath =
-      createM2OathHostedComposition()
+      createM2OathHostedComposition(
+        createTestM2OathAuthenticationOptions()
+      )
 
     const registrationGateway =
       new M2OathAgentRegistrationGateway({
         sdk: m2oath.sdk,
-        directory,
-        authentication: {}
+        directory
       })
 
     return createControlPlaneServer({
@@ -82,7 +87,8 @@ describe('hosted Developer -> Control Plane -> Agent identity acceptance', () =>
      * Their common authority is the shared control plane.
      */
     const developerClient = new HttpControlPlaneClient({
-      baseUrl
+      baseUrl,
+      bearerToken: TEST_DEVELOPER_TOKEN
     })
 
     const agentClient = new HttpControlPlaneClient({
@@ -140,7 +146,8 @@ describe('hosted Developer -> Control Plane -> Agent identity acceptance', () =>
     const { baseUrl } = await startControlPlane()
 
     const developerClient = new HttpControlPlaneClient({
-      baseUrl
+      baseUrl,
+      bearerToken: TEST_DEVELOPER_TOKEN
     })
 
     const agentClient = new HttpControlPlaneClient({

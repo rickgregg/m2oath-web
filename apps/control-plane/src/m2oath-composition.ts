@@ -22,41 +22,35 @@ import {
   M2OathSdk
 } from '@m2oath/sdk'
 
-/**
- * Temporary development principal for Phase 5.
- *
- * This is NOT production developer authentication.
- *
- * The future hosted HTTP authentication layer will verify a real
- * Developer JWT and pass the authenticated security context into
- * M2Oath. Keeping this provider explicit prevents the temporary
- * development behavior from being confused with production security.
- */
-const developmentPrincipal = {
-  type: 'developer-development',
-  subject: 'local-developer',
-  issuer: 'm2oath-control-plane-development'
-} as const
+export interface M2OathHostedDeveloperPrincipal {
+  type: string
+  subject: string
+  issuer?: string
+}
 
-const authenticationProvider: AuthenticationProvider = {
-  async authenticate() {
-    return {
-      authenticated: true,
-      assertion: {
-        ...developmentPrincipal,
-        authenticatedAt: new Date()
-      }
-    }
-  }
+export interface CreateM2OathHostedCompositionOptions {
+  /**
+   * Authentication authority for hosted lifecycle operations.
+   *
+   * Production will supply @m2oath/auth-jwt here.
+   */
+  authenticationProvider: AuthenticationProvider
+
+  /**
+   * Exact authenticated Developer principals authorized by M2Oath.
+   *
+   * JWT scopes are intentionally not used as lifecycle authority.
+   */
+  developerPrincipals: M2OathHostedDeveloperPrincipal[]
 }
 
 export interface M2OathHostedComposition {
   sdk: M2OathSdk
 }
 
-export function createM2OathHostedComposition():
-  M2OathHostedComposition
-{
+export function createM2OathHostedComposition(
+  options: CreateM2OathHostedCompositionOptions
+): M2OathHostedComposition {
   const identityStore =
     new InMemoryAgentIdentityStore()
 
@@ -88,23 +82,24 @@ export function createM2OathHostedComposition():
 
   const lifecycleAuthorizationPolicy =
     new ConfiguredAgentLifecycleAuthorizationPolicy({
-      grants: [
-        {
-          principal: {
-            ...developmentPrincipal
-          },
-          actions: [
-            'agent.create',
-            'agent.rotate-key',
-            'agent.disable'
-          ]
-        }
-      ]
+      grants:
+        options.developerPrincipals.map(
+          principal => ({
+            principal: {
+              ...principal
+            },
+            actions: [
+              'agent.create',
+              'agent.rotate-key',
+              'agent.disable'
+            ]
+          })
+        )
     })
 
   const authorizedEnrollmentService =
     new AuthorizedAgentEnrollmentService(
-      authenticationProvider,
+      options.authenticationProvider,
       lifecycleAuthorizationPolicy,
       enrollmentService,
       undefined,
@@ -119,7 +114,7 @@ export function createM2OathHostedComposition():
 
   const authorizedRotationService =
     new AuthorizedAgentCryptographicBindingRotationService(
-      authenticationProvider,
+      options.authenticationProvider,
       lifecycleAuthorizationPolicy,
       rotationService
     )
@@ -131,7 +126,7 @@ export function createM2OathHostedComposition():
 
   const authorizedDisableService =
     new AuthorizedAgentDisableService(
-      authenticationProvider,
+      options.authenticationProvider,
       lifecycleAuthorizationPolicy,
       lifecycleService
     )

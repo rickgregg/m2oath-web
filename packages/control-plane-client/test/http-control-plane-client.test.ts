@@ -24,6 +24,7 @@ describe('HttpControlPlaneClient', () => {
 
     const client = new HttpControlPlaneClient({
       baseUrl: 'https://control.m2oath.example/',
+      bearerToken: 'developer-token',
       fetch
     })
 
@@ -43,28 +44,87 @@ describe('HttpControlPlaneClient', () => {
 
     expect(result.agent.agentId).toBe('agt_server_123')
 
-    expect(fetch).toHaveBeenCalledWith(
-      'https://control.m2oath.example/v1/agents',
+    expect(fetch).toHaveBeenCalledOnce()
+
+    const [url, init] =
+      fetch.mock.calls[0]!
+
+    expect(url).toBe(
+      'https://control.m2oath.example/v1/agents'
+    )
+
+    expect(init?.method).toBe('POST')
+
+    const headers =
+      new Headers(init?.headers)
+
+    expect(
+      headers.get('content-type')
+    ).toBe('application/json')
+
+    expect(
+      headers.get('authorization')
+    ).toBe('Bearer developer-token')
+
+    expect(init?.body).toBe(JSON.stringify({
+      displayName: 'Weather Agent',
+      identifier: {
+        type: 'runtime-jwt',
+        value: 'weather-agent-runtime',
+        issuer: 'https://issuer.example'
+      },
+      cryptographicMaterial: {
+        keyId: 'weather-key-1',
+        algorithm: 'RS256',
+        publicKey: 'weather-public-key'
+      }
+    }))
+  })
+
+  it('keeps authentication out of the registration payload', async () => {
+    const fetch = vi.fn(async () => new Response(
+      JSON.stringify({
+        agent: {
+          agentId: 'agt_server_123',
+          status: 'active'
+        }
+      }),
       {
-        method: 'POST',
+        status: 200,
         headers: {
           'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          displayName: 'Weather Agent',
-          identifier: {
-            type: 'runtime-jwt',
-            value: 'weather-agent-runtime',
-            issuer: 'https://issuer.example'
-          },
-          cryptographicMaterial: {
-            keyId: 'weather-key-1',
-            algorithm: 'RS256',
-            publicKey: 'weather-public-key'
-          }
-        })
+        }
       }
-    )
+    ))
+
+    const client = new HttpControlPlaneClient({
+      baseUrl: 'https://control.m2oath.example',
+      bearerToken: 'secret-developer-token',
+      fetch
+    })
+
+    await client.registerAgent({
+      identifier: {
+        type: 'runtime-jwt',
+        value: 'runtime-agent'
+      }
+    })
+
+    const [, init] =
+      fetch.mock.calls[0]!
+
+    expect(
+      JSON.parse(String(init?.body))
+    ).toEqual({
+      identifier: {
+        type: 'runtime-jwt',
+        value: 'runtime-agent'
+      }
+    })
+
+    expect(
+      String(init?.body)
+    ).not.toContain('secret-developer-token')
   })
 
   it('gets an agent and safely encodes the route identifier', async () => {
@@ -147,7 +207,9 @@ describe('HttpControlPlaneClient', () => {
       fetch
     })
 
-    await expect(client.getAgent('agt_missing')).rejects.toEqual(
+    await expect(
+      client.getAgent('agt_missing')
+    ).rejects.toEqual(
       expect.objectContaining({
         name: 'ControlPlaneHttpError',
         status: 404,
@@ -155,7 +217,9 @@ describe('HttpControlPlaneClient', () => {
       })
     )
 
-    await expect(client.getAgent('agt_missing')).rejects.toBeInstanceOf(
+    await expect(
+      client.getAgent('agt_missing')
+    ).rejects.toBeInstanceOf(
       ControlPlaneHttpError
     )
   })

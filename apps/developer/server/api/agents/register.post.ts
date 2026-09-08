@@ -1,4 +1,5 @@
 import {
+  ControlPlaneHttpError,
   HttpControlPlaneClient
 } from '@m2oath/control-plane-client'
 
@@ -68,10 +69,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const developerToken =
+    config.developerToken?.trim()
+
+  if (!developerToken) {
+    throw createError({
+      statusCode: 503,
+      statusMessage:
+        'Developer authentication is not configured'
+    })
+  }
+
   const client =
     new HttpControlPlaneClient({
       baseUrl:
-        config.controlPlaneBaseUrl
+        config.controlPlaneBaseUrl,
+
+      bearerToken:
+        developerToken
     })
 
   try {
@@ -113,6 +128,24 @@ export default defineEventHandler(async (event) => {
         : {})
     })
   } catch (error) {
+    if (error instanceof ControlPlaneHttpError) {
+      if (error.status === 401) {
+        throw createError({
+          statusCode: 401,
+          statusMessage:
+            'Developer authentication failed'
+        })
+      }
+
+      if (error.status === 403) {
+        throw createError({
+          statusCode: 403,
+          statusMessage:
+            'Developer is not authorized to register agents'
+        })
+      }
+    }
+
     console.error(
       'Agent registration failed',
       error

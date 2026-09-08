@@ -2,9 +2,15 @@ import type {
   AgentSummary,
   RegisterAgentRequest
 } from '@m2oath/control-plane-client'
+import type {
+  AuthenticationRequest
+} from '@m2oath/agent'
 
 export interface AgentRegistrationGateway {
-  registerAgent(request: RegisterAgentRequest): Promise<AgentSummary>
+  registerAgent(
+    request: RegisterAgentRequest,
+    authentication: AuthenticationRequest
+  ): Promise<AgentSummary>
 }
 
 export interface AgentDirectory {

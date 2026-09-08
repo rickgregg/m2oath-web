@@ -2,9 +2,9 @@
 
 **Document Type:** Engineering Development Roadmap  
 **Status:** Active  
-**Date:** 2026-09-07  
+**Date:** 2026-09-08  
 **Repository:** `m2oath-web`  
-**Current Checkpoint:** `5cc41ca`  
+**Current Checkpoint:** Phase 6 implementation green; next Git checkpoint pending  
 **Related Documents:** `docs/WEBSITE_REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/ARCHITECTURE_DECISIONS.md`
 
 ---
@@ -224,7 +224,7 @@ It is a typed transport boundary only.
 Current baseline:
 
 ```text
-4 tests passing
+5 tests passing
 ```
 
 ---
@@ -370,160 +370,109 @@ pnpm build      GREEN
 
 # Phase 4 — Automated Cross-Application Acceptance Proof
 
-**Status:** NEXT
+**Status:** COMPLETE
 
-## Goal
+## Result
 
-Turn the manually proven Developer → Control Plane → Agent invariant into automated regression coverage.
+Automated acceptance coverage now proves:
 
-## Required Acceptance Behavior
+> **An Agent registered through the Developer path can be retrieved through the Agent path using the same M2Oath-issued canonical Agent ID.**
 
-Automate:
-
-```text
-Register Agent
-    ↓
-Shared Control Plane issues canonical Agent ID
-    ↓
-Retrieve Agent through Agent-facing path
-    ↓
-Returned canonical Agent ID is identical
-```
-
-The test should prove:
-
-> **An Agent registered through the Developer path can be retrieved through the Agent path using the same server-issued canonical Agent ID.**
-
-## Requirements
-
-The test must:
-
-- use the real shared control-plane boundary used by the hosted applications;
-- verify the server owns canonical identity issuance;
-- verify the same record is visible from the Agent side;
-- avoid duplicating identity logic inside the test;
-- avoid moving authority into either Nuxt application;
-- fail if Developer and Agent accidentally diverge into separate stores.
-
-## Exit Criteria
-
-- automated acceptance test green;
-- existing 9 package/API tests remain green;
-- workspace test/typecheck/lint/build remain green.
+The test uses the shared control-plane boundary and protects against Developer/Agent divergence without moving identity authority into either Nuxt application.
 
 ---
 
-# Phase 5 — Define the Authoritative M2Oath Integration Boundary
+# Phase 5 — Authoritative M2Oath Integration Boundary
 
-**Status:** PLANNED
+**Status:** COMPLETE
 
-## Goal
+## Result
 
-Replace the temporary hosted identity implementation without tightly coupling `m2oath-web` to internal files in `m2oath-agent`.
-
-## Required Design
-
-Define the stable public boundary through which the hosted control plane invokes:
-
-```text
-developer authentication
-agent.create authorization
-agent enrollment
-canonical Agent ID issuance
-creator provenance
-cryptographic binding
-runtime credential provisioning
-lifecycle operations
-```
-
-## Important Constraint
-
-Do not copy these implementations into `m2oath-web`.
-
-The integration should look conceptually like:
+The hosted control plane now delegates registration through a stable M2Oath package/service boundary:
 
 ```text
 m2oath-web Control Plane
-        │
-        ▼
-Stable M2Oath Service / Package Boundary
-        │
-        ▼
-Authoritative M2Oath Services
-```
-
-rather than:
-
-```text
-m2oath-web
     ↓
-imports framework internals directly
+M2OathAgentRegistrationGateway
+    ↓
+@m2oath/sdk
+    ↓
+Authoritative M2Oath lifecycle services
 ```
 
-## Design Questions
+Canonical Agent IDs are issued by M2Oath enrollment rather than by the hosted web layer. Creator provenance, identity/binding semantics, and lifecycle authorization remain M2Oath-owned.
 
-Before implementation decide:
-
-- which existing `m2oath-agent` public APIs are sufficient;
-- whether a new public composition/service package is required;
-- whether the hosted control plane invokes M2Oath in-process or through another service boundary;
-- how configuration is supplied;
-- how persistent stores are injected;
-- how developer authentication context reaches lifecycle authorization;
-- how runtime credentials are returned safely.
-
-## Exit Criteria
-
-A documented, tested integration contract exists before replacing the temporary store.
+The hosted control plane remains the composition root; no speculative `createM2OathSdk()` factory was introduced.
 
 ---
 
-# Phase 6 — Authoritative Agent Registration
+# Phase 6 — Authoritative Agent Registration and Developer Security Boundary
 
-**Status:** PLANNED
+**Status:** COMPLETE
 
-## Goal
+## Goal Achieved
 
-Replace temporary sequential identity issuance with real M2Oath enrollment.
+Replace temporary hosted identity issuance with authoritative M2Oath enrollment and protect `agent.create` with real Developer authentication and lifecycle authorization.
 
-## Target Flow
+## Implemented Flow
 
 ```text
-Developer
+Developer Browser
+    ↓ enrollment facts only
+Developer Nuxt Server
+    ↓ private Bearer credential
+@m2oath/control-plane-client
     ↓
-Authenticate
+POST /v1/agents
     ↓
-Resolve Developer Principal
+@m2oath/auth-jwt
+    ↓ signature + issuer + audience verification
+Authenticated Developer Principal
     ↓
-Authorize agent.create
+Exact-principal M2Oath lifecycle authorization
+    ↓ agent.create
+M2OathSdk.registerAgent()
     ↓
-M2Oath Enrollment
-    ├── canonical Agent ID
-    ├── creator provenance
-    ├── cryptographic binding
-    ├── lifecycle state
-    └── runtime credential provisioning
+Authoritative M2Oath Enrollment
     ↓
-Developer Registration Response
-    ↓
-Agent Application
+canonical agt_<UUID>
 ```
 
-## Required Properties
+## Security Properties Proven
 
-- canonical Agent ID issued by M2Oath;
+- canonical Agent ID is issued by M2Oath;
 - browser cannot choose Agent ID;
-- creator provenance recorded;
-- runtime identity independent from Developer identity;
-- registration creates no behavioral trust;
-- failed authorization produces no Agent;
-- failure is fail-closed.
+- Developer authentication is request-scoped;
+- Bearer authentication stays out of the registration payload;
+- real RS256 JWT verification is covered by integration tests;
+- a JWT signed by an untrusted key is rejected;
+- JWT `scope` / `scp` does not automatically become M2Oath authority;
+- exact authenticated Developer principal authorization controls `agent.create`;
+- missing Bearer credential returns 401;
+- failed authentication returns 401;
+- authenticated but unauthorized Developer returns 403;
+- Developer credential remains distinct from Agent Runtime identity and trust evidence;
+- registration remains fail-closed.
 
-## Migration Requirement
+## Developer Application Integration
 
-The existing `ControlPlaneClient` contract should remain stable where practical.
+The Developer Nuxt server holds the current configured Developer token in private runtime configuration and attaches it through `HttpControlPlaneClient`. The browser does not receive the token. This is an interim hosting/development seam; interactive Developer login/OIDC/session UX remains future work.
 
-Nuxt UI code should not need to understand M2Oath enrollment internals.
+## Validation
+
+September 8, 2026 workspace checkpoint:
+
+```text
+@m2oath/control-plane-client   5/5 tests
+@m2oath/control-plane         12/12 tests
+Total                         17/17 tests
+
+pnpm typecheck                GREEN
+pnpm test                     GREEN
+pnpm build                    GREEN
+```
+
+Phase 6 coding is complete.
 
 ---
 
@@ -566,61 +515,45 @@ Restarting the control plane does not lose registered Agent state.
 
 ---
 
-# Phase 8 — Developer Authentication
+# Phase 8 — Developer Login, OIDC, and Session Experience
 
-**Status:** PLANNED
+**Status:** PLANNED — CONTROL-PLANE FOUNDATION COMPLETE
 
 ## Goal
 
-Protect Developer workflows with real authentication and explicit M2Oath authorization.
+Replace the current configured server-side Developer-token seam with a real interactive Developer authentication/session experience without changing the Phase 6 control-plane security boundary.
 
-## Target Direction
+## Already Proven in Phase 6
+
+```text
+Bearer credential
+    ↓
+M2Oath JWT verification
+    ↓
+Authenticated Developer principal
+    ↓
+Exact-principal lifecycle authorization
+    ↓
+agent.create
+```
+
+Authentication and authorization failures already preserve 401/403 semantics, and Developer credentials remain separate from Agent Runtime credentials.
+
+## Remaining Work
 
 ```text
 Developer Browser
     ↓
-OIDC Authentication
+OIDC Login
     ↓
 Developer Session / Short-Lived Credential
     ↓
 Developer Nuxt Server
     ↓
-Control Plane
-    ↓
-M2Oath Authentication / Principal Resolution
-    ↓
-Lifecycle Authorization
+existing request-scoped control-plane authentication boundary
 ```
 
-## Required Invariants
-
-```text
-Authentication != Authorization
-Developer Identity != Agent Identity
-Developer Credential != Agent Runtime Credential
-JWT Scope != Automatic M2Oath Authority
-```
-
-## Initial Protected Operation
-
-```text
-agent.create
-```
-
-Later:
-
-```text
-agent.rotate-key
-agent.disable
-```
-
-and future:
-
-```text
-agent.configure
-agent.recover
-agent.delete
-```
+The login/session layer must not place Developer credentials in enrollment payloads or convert JWT scopes into automatic M2Oath authority.
 
 ---
 

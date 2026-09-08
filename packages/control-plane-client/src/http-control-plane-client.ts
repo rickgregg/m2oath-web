@@ -8,15 +8,33 @@ import type {
 export interface HttpControlPlaneClientOptions {
   baseUrl: string
   fetch?: typeof globalThis.fetch
+
+  /**
+   * Optional caller credential transported through the HTTP
+   * Authorization header.
+   *
+   * Credentials are transport/security context. They are never added
+   * to Agent enrollment payloads.
+   */
+  bearerToken?: string
 }
 
 export class HttpControlPlaneClient implements ControlPlaneClient {
   private readonly baseUrl: string
   private readonly fetch: typeof globalThis.fetch
+  private readonly bearerToken?: string
 
   constructor(options: HttpControlPlaneClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '')
     this.fetch = options.fetch ?? globalThis.fetch
+
+    const bearerToken =
+      options.bearerToken?.trim()
+
+    this.bearerToken =
+      bearerToken
+        ? bearerToken
+        : undefined
   }
 
   async registerAgent(
@@ -45,7 +63,29 @@ export class HttpControlPlaneClient implements ControlPlaneClient {
     path: string,
     init?: RequestInit
   ): Promise<T> {
-    const response = await this.fetch(`${this.baseUrl}${path}`, init)
+    const headers =
+      new Headers(init?.headers)
+
+    if (this.bearerToken) {
+      headers.set(
+        'authorization',
+        `Bearer ${this.bearerToken}`
+      )
+    }
+
+    const requestInit: RequestInit | undefined =
+      init === undefined && !this.bearerToken
+        ? undefined
+        : {
+            ...init,
+            headers
+          }
+
+    const response =
+      await this.fetch(
+        `${this.baseUrl}${path}`,
+        requestInit
+      )
 
     if (!response.ok) {
       throw new ControlPlaneHttpError(
@@ -63,7 +103,9 @@ export class ControlPlaneHttpError extends Error {
     public readonly status: number,
     public readonly statusText: string
   ) {
-    super(`M2Oath control-plane request failed: ${status} ${statusText}`)
+    super(
+      `M2Oath control-plane request failed: ${status} ${statusText}`
+    )
     this.name = 'ControlPlaneHttpError'
   }
 }

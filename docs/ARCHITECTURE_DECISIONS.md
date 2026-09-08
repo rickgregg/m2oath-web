@@ -2,7 +2,7 @@
 
 **Document Type:** Architecture Decision Record  
 **Status:** Active  
-**Date:** 2026-09-07  
+**Date:** 2026-09-08  
 **Repository:** `m2oath-web`  
 **Related Documents:** `docs/ARCHITECTURE.md`, `docs/WEBSITE_REQUIREMENTS.md`
 
@@ -252,61 +252,39 @@ The governing identity rule remains:
 
 ---
 
-# ADR-007 — Use an In-Memory Store Only as a Temporary Architecture Scaffold
+# ADR-007 — Keep Hosted Directory State as a Temporary Projection
 
 **Status:** Accepted Temporarily
 
 ## Context
 
-The first Day 3 objective was to prove that separate Developer and Agent applications could share one authoritative backend before adding production persistence and full M2Oath enrollment.
-
-A database would have added implementation work without proving a more important architectural property.
+The first hosted slice used an in-memory store both to prove shared state and to issue temporary sequential Agent IDs. Authoritative M2Oath enrollment is now integrated, so the hosted store must no longer be described as the canonical identity authority.
 
 ## Decision
 
-Use `InMemoryAgentStore` temporarily inside the shared control-plane process.
+Retain process-local hosted directory state only as a temporary projection for current Agent list/detail experiences. Canonical Agent identity is issued by M2Oath enrollment.
 
 ## Consequences
 
-The architecture can be tested quickly.
-
-State disappears when the process restarts.
-
-This store is not a production persistence design and must eventually be replaced behind the control-plane boundary.
-
-No application should begin depending on in-memory implementation details.
+Restarting the control plane can still lose the hosted projection. Durable persistence remains required, but no future persistence design may turn the hosted directory into a competing identity or policy authority.
 
 ---
 
-# ADR-008 — Temporary Sequential Agent IDs Are Not the Final Identity Authority
+# ADR-008 — Canonical Agent IDs Are Issued by M2Oath Enrollment
 
-**Status:** Accepted Temporarily
+**Status:** Superseded Scaffold Decision / Current Rule Accepted
 
 ## Context
 
-The initial vertical slice required a server-issued canonical identifier to prove that the browser did not manufacture identity.
-
-The hosted control plane is not yet integrated with authoritative M2Oath enrollment.
+The initial Day 3 scaffold issued sequential IDs such as `agt_000001` only to prove that browsers did not manufacture identity. Phase 5 replaced that temporary authority path.
 
 ## Decision
 
-Allow the Day 3 scaffold to issue development identifiers such as:
-
-```text
-agt_000001
-```
-
-from the shared server process.
+The hosted control plane must not manufacture canonical Agent IDs. Registration delegates to the public M2Oath lifecycle/enrollment boundary, which issues canonical `agt_<UUID>` identities.
 
 ## Consequences
 
-This proves server ownership of identity in the web architecture.
-
-It does **not** establish the control-plane store as the final M2Oath identity authority.
-
-Production registration must delegate identity issuance to the authoritative M2Oath enrollment boundary.
-
-The web repository must not evolve this temporary generator into an independent identity implementation.
+The browser, Developer Nuxt server, control-plane transport, and hosted directory cannot choose canonical Agent identity. The original sequential-ID mechanism is historical scaffold behavior only.
 
 ---
 
@@ -670,78 +648,85 @@ The September 7, 2026 Developer → Control Plane → Agent checkpoint passed al
 
 # ADR-020 — Automate the Cross-Application Identity Invariant
 
-**Status:** Proposed — Next Implementation Step
+**Status:** Accepted and Implemented
 
 ## Context
 
-The first vertical slice was manually demonstrated:
-
-```text
-Developer
-    ↓
-register Weather Agent
-    ↓
-Shared Control Plane
-    ↓
-agt_000001
-    ↓
-Agent
-    ↓
-retrieve the same authoritative record
-```
-
-This is one of the most important hosted-platform invariants.
-
-Manual proof is useful, but regression protection should be automated.
+Developer and Agent are separate applications that must observe the same canonical registered Agent.
 
 ## Decision
 
-Add an acceptance-level test that proves:
+Maintain acceptance coverage proving:
 
-> **An Agent registered through the Developer path can be retrieved through the Agent path using the same server-issued canonical Agent ID.**
-
-The test must not move identity logic into either Nuxt application.
+> **An Agent registered through the Developer path can be retrieved through the Agent path using the same M2Oath-issued canonical Agent ID.**
 
 ## Consequences
 
-Future refactoring of routing, clients, persistence, or authoritative M2Oath integration can be checked against the original cross-application identity guarantee.
+Refactoring of routing, clients, persistence, or M2Oath composition is protected against accidental divergence of Developer and Agent identity state.
 
 ---
 
-# ADR-021 — Integrate Authoritative M2Oath Enrollment Through a Stable Boundary
+# ADR-021 — Integrate Authoritative M2Oath Enrollment Through Public Package Boundaries
 
-**Status:** Proposed
+**Status:** Accepted and Implemented
 
 ## Context
 
-The current hosted control plane uses temporary identity issuance.
-
-The authoritative identity and lifecycle implementation already belongs conceptually to the reusable M2Oath framework.
-
-Directly reaching into internal framework files would tightly couple the hosted service to implementation details.
+The hosted control plane needed authoritative M2Oath enrollment without copying framework internals into `m2oath-web`.
 
 ## Decision
 
-Define a stable public service/package boundary through which the hosted control plane can invoke authoritative M2Oath enrollment and lifecycle operations.
+Use a hosted adapter/composition boundary that delegates registration through `@m2oath/sdk` and authoritative M2Oath lifecycle services. The hosted control plane does not issue canonical identity itself.
 
-The exact packaging and deployment mechanism should be decided when implementing this integration.
+Current path:
 
-## Constraints
-
-The solution must preserve:
-
-- canonical server-issued Agent ID;
-- developer authentication;
-- `agent.create` authorization;
-- creator provenance;
-- cryptographic binding;
-- lifecycle state;
-- independent Agent Runtime credential;
-- fail-closed behavior.
+```text
+m2oath-web Control Plane
+    ↓
+M2OathAgentRegistrationGateway
+    ↓
+M2OathSdk.registerAgent()
+    ↓
+AuthorizedAgentEnrollmentService
+    ↓
+AgentEnrollmentService
+    ↓
+AgentRegistrationService
+    ↓
+canonical Agent ID
+```
 
 ## Consequences
 
-The temporary control-plane ID generator can be removed without forcing the Nuxt applications to change their authority model.
+Canonical ID issuance, creator provenance, identity/binding semantics, and lifecycle authorization remain M2Oath-owned. The hosted repository remains an orchestration/API surface rather than a duplicate security engine.
+
+---
+
+# ADR-022 — Developer Authentication Is Request-Scoped and Cryptographically Verified
+
+**Status:** Accepted
+
+## Context
+
+Protected Developer lifecycle operations require a Developer principal, but Developer credentials must remain distinct from Agent enrollment data and Agent Runtime credentials. Authentication and authorization also need distinct failure semantics.
+
+## Decision
+
+For protected registration:
+
+- the Developer Nuxt server attaches a private Bearer credential through `@m2oath/control-plane-client`;
+- the client keeps the credential out of `RegisterAgentRequest`;
+- the control plane passes authentication per request and never caches caller credentials in the registration gateway;
+- production composition verifies Developer JWT signature, issuer, and audience through `@m2oath/auth-jwt` using remote JWKS configuration;
+- M2Oath lifecycle policy grants `agent.create` only to configured exact Developer principals;
+- JWT `scope` / `scp` claims do not automatically become M2Oath lifecycle authority;
+- missing credentials map to 401, failed authentication maps to 401, and authenticated-but-unauthorized principals map to 403.
+
+## Consequences
+
+The Developer credential remains HTTP/security context only. It does not become canonical Agent identity, Agent Runtime credential, Agent trust evidence, or automatic capability authority.
+
+The currently configured Developer Nuxt token is a private server-side seam. A future OIDC/login/session implementation can replace how that request-scoped credential is obtained without changing the control-plane security boundary.
 
 ---
 
