@@ -28,7 +28,17 @@ describe('HttpControlPlaneClient', () => {
     })
 
     const result = await client.registerAgent({
-      displayName: 'Weather Agent'
+      displayName: 'Weather Agent',
+      identifier: {
+        type: 'runtime-jwt',
+        value: 'weather-agent-runtime',
+        issuer: 'https://issuer.example'
+      },
+      cryptographicMaterial: {
+        keyId: 'weather-key-1',
+        algorithm: 'RS256',
+        publicKey: 'weather-public-key'
+      }
     })
 
     expect(result.agent.agentId).toBe('agt_server_123')
@@ -41,7 +51,17 @@ describe('HttpControlPlaneClient', () => {
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          displayName: 'Weather Agent'
+          displayName: 'Weather Agent',
+          identifier: {
+            type: 'runtime-jwt',
+            value: 'weather-agent-runtime',
+            issuer: 'https://issuer.example'
+          },
+          cryptographicMaterial: {
+            keyId: 'weather-key-1',
+            algorithm: 'RS256',
+            publicKey: 'weather-public-key'
+          }
         })
       }
     )

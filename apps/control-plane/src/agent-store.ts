@@ -3,38 +3,47 @@ import type {
   RegisterAgentRequest
 } from '@m2oath/control-plane-client'
 
-export interface AgentStore {
-  registerAgent(request: RegisterAgentRequest): AgentSummary
+export interface AgentRegistrationGateway {
+  registerAgent(request: RegisterAgentRequest): Promise<AgentSummary>
+}
+
+export interface AgentDirectory {
   getAgent(agentId: string): AgentSummary | undefined
   listAgents(): AgentSummary[]
 }
 
-export class InMemoryAgentStore implements AgentStore {
+export interface AgentDirectoryWriter {
+  saveAgent(agent: AgentSummary): void
+}
+
+/**
+ * Temporary hosted read model.
+ *
+ * This class no longer has any authority to issue canonical Agent IDs.
+ * Canonical identity issuance belongs to M2Oath.
+ */
+export class InMemoryAgentDirectory
+  implements AgentDirectory, AgentDirectoryWriter
+{
   private readonly agents = new Map<string, AgentSummary>()
-  private nextId = 1
 
-  registerAgent(request: RegisterAgentRequest): AgentSummary {
-    const agentId = `agt_${String(this.nextId).padStart(6, '0')}`
-    this.nextId += 1
-
-    const agent: AgentSummary = {
-      agentId,
-      status: 'active',
-      ...(request.displayName
-        ? { displayName: request.displayName }
-        : {})
-    }
-
-    this.agents.set(agentId, agent)
-
-    return agent
+  saveAgent(agent: AgentSummary): void {
+    this.agents.set(agent.agentId, {
+      ...agent
+    })
   }
 
   getAgent(agentId: string): AgentSummary | undefined {
-    return this.agents.get(agentId)
+    const agent = this.agents.get(agentId)
+
+    return agent === undefined
+      ? undefined
+      : { ...agent }
   }
 
   listAgents(): AgentSummary[] {
-    return [...this.agents.values()]
+    return [...this.agents.values()].map(agent => ({
+      ...agent
+    }))
   }
 }

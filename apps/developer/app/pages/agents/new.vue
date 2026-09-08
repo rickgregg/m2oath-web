@@ -8,28 +8,132 @@ useSeoMeta({
 })
 
 const displayName = ref('')
-const registering = ref(false)
-const registration = ref<RegisterAgentResponse | null>(null)
-const errorMessage = ref<string | null>(null)
+
+const identifierType =
+  ref('runtime-jwt')
+
+const identifierValue =
+  ref('')
+
+const identifierIssuer =
+  ref('')
+
+const keyId =
+  ref('')
+
+const algorithm =
+  ref('')
+
+const publicKey =
+  ref('')
+
+const registering =
+  ref(false)
+
+const registration =
+  ref<RegisterAgentResponse | null>(null)
+
+const errorMessage =
+  ref<string | null>(null)
 
 async function registerAgent() {
   registering.value = true
   registration.value = null
   errorMessage.value = null
 
-  try {
-    registration.value = await $fetch<RegisterAgentResponse>(
-      '/api/agents/register',
-      {
-        method: 'POST',
-        body: {
-          displayName: displayName.value
-        }
-      }
+  const trimmedIdentifierType =
+    identifierType.value.trim()
+
+  const trimmedIdentifierValue =
+    identifierValue.value.trim()
+
+  if (
+    !trimmedIdentifierType ||
+    !trimmedIdentifierValue
+  ) {
+    errorMessage.value =
+      'Identifier type and identifier value are required.'
+
+    registering.value = false
+    return
+  }
+
+  const trimmedKeyId =
+    keyId.value.trim()
+
+  const trimmedAlgorithm =
+    algorithm.value.trim()
+
+  const trimmedPublicKey =
+    publicKey.value.trim()
+
+  const hasAnyCryptographicMaterial =
+    Boolean(
+      trimmedKeyId ||
+      trimmedAlgorithm ||
+      trimmedPublicKey
     )
+
+  const hasCompleteCryptographicMaterial =
+    Boolean(
+      trimmedKeyId &&
+      trimmedAlgorithm &&
+      trimmedPublicKey
+    )
+
+  if (
+    hasAnyCryptographicMaterial &&
+    !hasCompleteCryptographicMaterial
+  ) {
+    errorMessage.value =
+      'If cryptographic material is provided, key ID, algorithm, and public key are all required.'
+
+    registering.value = false
+    return
+  }
+
+  try {
+    registration.value =
+      await $fetch<RegisterAgentResponse>(
+        '/api/agents/register',
+        {
+          method: 'POST',
+
+          body: {
+            displayName:
+              displayName.value,
+
+            identifier: {
+              type:
+                trimmedIdentifierType,
+
+              value:
+                trimmedIdentifierValue,
+
+              issuer:
+                identifierIssuer.value.trim()
+            },
+
+            ...(hasCompleteCryptographicMaterial
+              ? {
+                  cryptographicMaterial: {
+                    keyId:
+                      trimmedKeyId,
+
+                    algorithm:
+                      trimmedAlgorithm,
+
+                    publicKey:
+                      trimmedPublicKey
+                  }
+                }
+              : {})
+          }
+        }
+      )
   } catch {
-    errorMessage.value
-      = 'The agent could not be registered through the M2Oath control plane.'
+    errorMessage.value =
+      'The agent could not be registered through the M2Oath control plane.'
   } finally {
     registering.value = false
   }
@@ -45,7 +149,7 @@ async function registerAgent() {
 
       <p class="mt-4 text-muted">
         Register a new agent through the authoritative M2Oath control plane.
-        The canonical Agent ID is issued by the server.
+        The canonical Agent ID is issued by M2Oath.
       </p>
 
       <UCard class="mt-8">
@@ -61,6 +165,101 @@ async function registerAgent() {
               v-model="displayName"
               class="w-full"
               placeholder="Weather Agent"
+              :disabled="registering"
+            />
+          </UFormField>
+
+          <div>
+            <h2 class="text-lg font-semibold">
+              External identity
+            </h2>
+
+            <p class="mt-1 text-sm text-muted">
+              These values identify the external runtime identity that
+              will be bound to the canonical M2Oath Agent ID.
+            </p>
+          </div>
+
+          <UFormField
+            label="Identifier type"
+            description="The kind of external identity presented by the agent."
+            required
+          >
+            <UInput
+              v-model="identifierType"
+              class="w-full"
+              placeholder="runtime-jwt"
+              :disabled="registering"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Identifier value"
+            description="The external identity value that uniquely identifies this agent."
+            required
+          >
+            <UInput
+              v-model="identifierValue"
+              class="w-full"
+              placeholder="weather-agent-runtime"
+              :disabled="registering"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Issuer"
+            description="Optional issuer associated with this external identity."
+          >
+            <UInput
+              v-model="identifierIssuer"
+              class="w-full"
+              placeholder="https://issuer.example"
+              :disabled="registering"
+            />
+          </UFormField>
+
+          <div>
+            <h2 class="text-lg font-semibold">
+              Cryptographic binding
+            </h2>
+
+            <p class="mt-1 text-sm text-muted">
+              Optional public cryptographic material can be bound to the
+              new canonical identity during enrollment.
+            </p>
+          </div>
+
+          <UFormField
+            label="Key ID"
+          >
+            <UInput
+              v-model="keyId"
+              class="w-full"
+              placeholder="weather-key-1"
+              :disabled="registering"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Algorithm"
+          >
+            <UInput
+              v-model="algorithm"
+              class="w-full"
+              placeholder="RS256"
+              :disabled="registering"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Public key"
+            description="Public key material only. Never enter a private key."
+          >
+            <UTextarea
+              v-model="publicKey"
+              class="w-full"
+              :rows="6"
+              placeholder="-----BEGIN PUBLIC KEY-----"
               :disabled="registering"
             />
           </UFormField>
@@ -95,8 +294,8 @@ async function registerAgent() {
             </p>
 
             <p class="mt-1 text-sm text-muted">
-              The canonical Agent ID below was issued by the M2Oath
-              control plane.
+              The canonical Agent ID below was issued by the
+              authoritative M2Oath identity stack.
             </p>
           </div>
         </template>

@@ -1,5 +1,7 @@
 export type {
   AgentSummary,
+  RegisterAgentIdentifier,
+  RegisterAgentCryptographicMaterial,
   RegisterAgentRequest,
   RegisterAgentResponse
 } from './types.js'

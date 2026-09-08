@@ -243,9 +243,18 @@ importers:
 
   apps/control-plane:
     dependencies:
+      '@m2oath/agent':
+        specifier: file:../../../m2oath-agent/packages/agent
+        version: file:../m2oath-agent/packages/agent
       '@m2oath/control-plane-client':
         specifier: workspace:*
         version: link:../../packages/control-plane-client
+      '@m2oath/persistence':
+        specifier: file:../../../m2oath-agent/packages/persistence
+        version: file:../m2oath-agent/packages/persistence(@m2oath/agent@file:../m2oath-agent/packages/agent)
+      '@m2oath/sdk':
+        specifier: file:../../../m2oath-agent/packages/sdk
+        version: file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)
     devDependencies:
       '@types/node':
         specifier: ^26.4.1
@@ -1246,6 +1255,19 @@ packages:
 
   '@kwsites/promise-deferred@1.1.1':
     resolution: {integrity: sha512-GaHYm+c0O9MjZRu0ongGBRbinu8gVAMd2UZjji6jVmqKtZluZnptXGWhz1E8j8D2HJ3f/yMxKAUC0b+57wncIw==}
+
+  '@m2oath/agent@file:../m2oath-agent/packages/agent':
+    resolution: {directory: ../m2oath-agent/packages/agent, type: directory}
+
+  '@m2oath/persistence@file:../m2oath-agent/packages/persistence':
+    resolution: {directory: ../m2oath-agent/packages/persistence, type: directory}
+    peerDependencies:
+      '@m2oath/agent': ^0.1.0
+
+  '@m2oath/sdk@file:../m2oath-agent/packages/sdk':
+    resolution: {directory: ../m2oath-agent/packages/sdk, type: directory}
+    peerDependencies:
+      '@m2oath/agent': ^0.1.0
 
   '@mapbox/node-pre-gyp@2.0.3':
     resolution: {integrity: sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg==}
@@ -6962,6 +6984,16 @@ snapshots:
       - supports-color
 
   '@kwsites/promise-deferred@1.1.1': {}
+
+  '@m2oath/agent@file:../m2oath-agent/packages/agent': {}
+
+  '@m2oath/persistence@file:../m2oath-agent/packages/persistence(@m2oath/agent@file:../m2oath-agent/packages/agent)':
+    dependencies:
+      '@m2oath/agent': file:../m2oath-agent/packages/agent
+
+  '@m2oath/sdk@file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)':
+    dependencies:
+      '@m2oath/agent': file:../m2oath-agent/packages/agent
 
   '@mapbox/node-pre-gyp@2.0.3(supports-color@10.2.2)':
     dependencies:
