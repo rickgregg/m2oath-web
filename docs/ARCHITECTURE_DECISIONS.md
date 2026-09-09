@@ -2,7 +2,7 @@
 
 **Document Type:** Architecture Decision Record  
 **Status:** Active  
-**Date:** 2026-09-08  
+**Date:** 2026-09-09  
 **Repository:** `m2oath-web`  
 **Related Documents:** `docs/ARCHITECTURE.md`, `docs/WEBSITE_REQUIREMENTS.md`
 
@@ -22,7 +22,7 @@ Decisions may evolve, but changes should be deliberate and recorded rather than 
 
 # ADR-001 — Separate the Hosted Web Platform from the Open-Source Framework
 
-**Status:** Accepted
+**Status:** Superseded in part by ADR-024
 
 ## Context
 
@@ -266,7 +266,7 @@ Retain process-local hosted directory state only as a temporary projection for c
 
 ## Consequences
 
-Restarting the control plane can still lose the hosted projection. Durable persistence remains required, but no future persistence design may turn the hosted directory into a competing identity or policy authority.
+Restarting the control plane can still lose the hosted projection. Durable persistence remains required, but no future persistence design may turn the hosted directory into a competing identity or policy authority. As of 2026-09-08, the reusable persistence implementation exists in `m2oath-agent` through `@m2oath/persistence-mysql`; this ADR remains active until the hosted control plane consumes that boundary and retires the process-local projection.
 
 ---
 
@@ -754,3 +754,269 @@ The most important separation remains:
 > **The hosted platform is a management and observation surface over M2Oath authority. It is not a replacement authority system.**
 
 Future decisions should preserve that boundary unless a later ADR explicitly supersedes it.
+
+---
+
+# ADR-023 — Consume Reusable M2Oath Persistence Rather Than Invent Hosted Persistence Authority
+
+**Status:** Superseded in part by ADR-024
+
+## Context
+
+The open-source `m2oath-agent` repository now provides reusable MySQL
+persistence for canonical Agent identity, lifecycle state, external identity
+bindings, cryptographic bindings, registration provenance, lifecycle/general
+audit evidence, and factual usage/outcome history.
+
+The implementation is checkpointed at:
+
+``` text
+75b9e58  Update 09-08-2026 2:16pm
+```
+
+The hosted control plane still contains a process-local Agent directory
+projection for current list/detail experiences.
+
+## Decision
+
+`m2oath-web` will consume the public M2Oath persistence/service boundary rather
+than create a separate hosted identity persistence model.
+
+The target composition is:
+
+``` text
+Hosted Control Plane
+        |
+        v
+Authoritative M2Oath Services
+        |
+        v
+@m2oath/persistence-mysql
+        |
+        v
+Hosted MySQL Infrastructure
+```
+
+The hosted platform owns composition and deployed infrastructure. The
+open-source framework owns reusable contracts and persistence adapters.
+
+## Consequences
+
+- canonical identity semantics remain M2Oath-owned;
+- authentication and lifecycle authorization remain outside the database;
+- the database stores durable facts and transaction state rather than policy;
+- the hosted control plane does not duplicate identity/lifecycle persistence
+  logic already implemented in the reusable framework;
+- `m2oath-web` Phase 7 remains incomplete until the process-local hosted
+  directory is replaced as the durable Agent-state source; and
+- the Trust Container / `ProtectedOperationExecutor` remains the final
+  protected-execution enforcement boundary.
+
+## Governing Test
+
+> **Could the hosted control plane be reconstructed against durable state while
+> preserving the same M2Oath identity, authorization, trust, and execution
+> boundaries?**
+
+The answer must be **yes** before hosted persistent-control-plane work is
+considered complete.
+
+---
+
+# ADR-024 — Separate the Public Trust Container Runtime from Proprietary Trust and Domain Services
+
+**Status:** Accepted
+
+## Context
+
+The original repository boundary treated `m2oath-agent` as a broad reusable open-source framework containing both portable Trust Container capabilities and server-side identity, lifecycle, persistence, and trust infrastructure. As the product architecture matured, that boundary became too broad.
+
+M2Oath needs three distinct architectural roles:
+
+1. a public developer runtime for constructing and running M2Oath AI Trust Containers;
+2. proprietary server-side M2Oath Trust services that support those containers with authoritative registration, identity, lifecycle, behavioral trust, accumulated trust, history, provenance, policy management, credentials, and persistence; and
+3. Trusted Domain services that remain authoritative for domain-specific evidence and semantics.
+
+These roles may be developed in the same monorepo temporarily. Repository co-location is a development convenience and must not create implementation coupling that prevents later physical separation.
+
+## Decision
+
+Adopt the following architectural boundary:
+
+```text
+                    DEVELOPER / CUSTOMER RUNTIME
+
+┌──────────────────────────────────────────────────────────┐
+│                    m2oath-agent                          │
+│               PUBLIC / npm / open source                 │
+│                                                          │
+│                  AI TRUST CONTAINER                      │
+│                                                          │
+│  • construct and bootstrap Trust Containers              │
+│  • encapsulate AI Agents                                 │
+│  • protected-operation definitions                       │
+│  • trust/evidence provider contracts                     │
+│  • executable TypeScript trust rules                     │
+│  • policy evaluation                                     │
+│  • ProtectedOperationExecutor                            │
+│  • local ALLOW / DENY enforcement                        │
+│  • portable integration adapters                         │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+                           │ authenticated service/provider APIs
+                           │
+═══════════════════════════╪════════════════════════════════
+                     NETWORK BOUNDARY
+═══════════════════════════╪════════════════════════════════
+                           │
+                ┌──────────┴───────────┐
+                │                      │
+                ▼                      ▼
+┌────────────────────────────┐  ┌────────────────────────────┐
+│       m2oath-trust         │  │      TRUSTED DOMAINS       │
+│       PROPRIETARY          │  │                            │
+│                            │  │  m2oath-weather            │
+│ • Developer accounts       │  │  finance                   │
+│ • Agent registration       │  │  logistics                 │
+│ • canonical identity       │  │  energy                    │
+│ • lifecycle                │  │  mobility                  │
+│ • credential/binding mgmt  │  │  commerce                  │
+│ • behavioral evidence      │  │  third-party domains       │
+│ • accumulated trust        │  │                            │
+│ • trust/history            │  │ domain-specific evidence   │
+│ • provenance/audit         │  │ validation and semantics   │
+│ • policy management        │  │                            │
+│ • server-side persistence  │  │                            │
+│ • administration/APIs      │  │                            │
+└─────────────┬──────────────┘  └─────────────┬──────────────┘
+              │                               │
+              └──────── explicit domain ──────┘
+                         controller interface
+```
+
+`m2oath-agent` is the public developer framework for constructing and running M2Oath Trust Containers. It must not require proprietary M2Oath Trust server implementations or Trusted Domain server implementations to be linked into the runtime.
+
+`m2oath-trust` is the proprietary server-side support system for Trust Containers. It owns authoritative hosted Agent registration, canonical identity state, lifecycle, behavioral and accumulated trust state, history, provenance, credential/binding management, policy-management services, persistence, and administrative/service APIs.
+
+Trusted Domain servers remain separate domain authorities. `m2oath-weather` is the first reference domain. Future domains may be operated by M2Oath or third parties.
+
+## Server-Side Trusted Domain Interface
+
+`m2oath-trust` must expose a domain-neutral server-side controller/provider interface through which Trusted Domain implementations can be registered or connected without modifying M2Oath core trust logic.
+
+Conceptually:
+
+```ts
+export interface TrustedDomainController<TRequest, TEvidence> {
+  readonly domain: string
+
+  getEvidence(request: TRequest): Promise<TEvidence>
+}
+```
+
+The exact TypeScript contract is not fixed by this ADR. The invariant is the explicit plugin/service boundary.
+
+A Trusted Domain controller may:
+
+- interpret domain-specific requests;
+- obtain and validate domain data;
+- apply domain-specific verification and trust calculations;
+- produce provenance-bearing domain evidence; and
+- expose that evidence through the M2Oath domain boundary.
+
+A Trusted Domain controller may not:
+
+- issue canonical M2Oath Agent identity;
+- grant M2Oath lifecycle authority;
+- convert domain evidence directly into protected-operation execution authority; or
+- bypass Trust Container enforcement.
+
+The governing rule remains:
+
+> **The evidence is vertical. The method of trust is horizontal.**
+
+More precisely:
+
+> **M2Oath Trust is authoritative for M2Oath identity, lifecycle, behavioral and accumulated trust state, and related hosted trust services. Trusted Domain servers are authoritative for evidence and semantics within their domains. The Trust Container consumes those inputs, evaluates executable policy, and remains the protected-operation enforcement boundary.**
+
+## Dependency and Repository Boundary
+
+Logical separation is required immediately even if physical repository separation is deferred.
+
+Public Trust Container packages must not depend on proprietary `m2oath-trust` implementations, proprietary persistence implementations, or Trusted Domain server implementations. Integration occurs through explicit contracts and authenticated network/service boundaries.
+
+The desired dependency direction is:
+
+```text
+public Trust Container contracts/runtime
+            ▲
+            │ implements/serves compatible contracts
+            │
+proprietary m2oath-trust + Trusted Domain services
+```
+
+A small shared contracts package may be introduced later if concrete dependency pressure justifies it; this ADR does not require one.
+
+Before public npm publication, packages and files must be classified and physically separated as necessary so proprietary server implementation is not published accidentally. The eventual repository split should be an extraction exercise rather than an architectural redesign.
+
+## Trust Evaluation and Enforcement
+
+The Trust Container remains the execution boundary regardless of where trust inputs originate.
+
+```text
+M2Oath Trust State ───────┐
+                          │
+Domain Trust Evidence ────┼──► Executable TypeScript Rules
+                          │              │
+Operation Context ────────┘              ▼
+                                       Policy
+                                         │
+                                         ▼
+                                    ALLOW / DENY
+                                         │
+                                         ▼
+                            ProtectedOperationExecutor
+                                         │
+                                 only if permitted
+                                         ▼
+                                Encapsulated Agent
+```
+
+Neither `m2oath-trust` nor a Trusted Domain server becomes the protected-operation executor merely because it supplied authoritative trust state or evidence.
+
+## Consequences
+
+- `m2oath-agent` has a clear public product purpose: developers use it to construct and run M2Oath Trust Containers.
+- proprietary registration, identity/lifecycle infrastructure, behavioral-trust algorithms, accumulated-trust services, databases, and hosted administration belong to `m2oath-trust`.
+- server-side persistence such as MySQL is not part of the required public Trust Container runtime boundary.
+- `m2oath-weather` and future Trusted Domains integrate through explicit domain interfaces rather than becoming dependencies of M2Oath core.
+- M2Oath-operated and third-party Trusted Domains can coexist behind the same architectural seam.
+- the public runtime can remain usable without receiving M2Oath proprietary server source code.
+- local protected-operation enforcement remains possible even when trust/evidence is obtained over authenticated network boundaries.
+- temporary monorepo co-location is permitted, but dependency boundaries must preserve independent extraction.
+- the current `mcp-workspace` may later host `m2oath-trust`, `m2oath-weather`, and other private server-side components, but this ADR does not authorize modifying that repository yet.
+
+## Superseded and Refined Decisions
+
+This ADR refines earlier decisions as follows:
+
+- **ADR-001:** repository separation is no longer the primary architectural boundary. Logical package/service separation is primary; physical repository separation may occur later. `m2oath-agent` specifically represents the public Trust Container runtime rather than all reusable M2Oath server functionality.
+- **ADR-008:** canonical Agent IDs remain M2Oath-issued, but authoritative registration/enrollment is a responsibility of proprietary `m2oath-trust`, not a requirement of the public Trust Container package.
+- **ADR-009:** the Trust Container remains the protected-operation enforcement boundary; proprietary M2Oath Trust services supply authoritative hosted state and services rather than replacing local enforcement.
+- **ADR-016:** Trusted Domains remain outside M2Oath core and now additionally integrate with server-side M2Oath Trust through an explicit domain-controller/provider interface.
+- **ADR-018:** `@m2oath/agent` remains distinct from `@m2oath/agent-web`, with its public purpose narrowed and clarified as the Trust Container developer/runtime package.
+- **ADR-021:** the existing enrollment path remains valid implementation work, but registration/lifecycle server implementation is classified as proprietary `m2oath-trust` functionality rather than necessarily public package functionality.
+- **ADR-023:** its database-authority invariants remain valid, but reusable MySQL persistence for authoritative hosted identity, lifecycle, behavioral trust, and related server state is classified as proprietary `m2oath-trust` implementation rather than part of the required public framework.
+
+## Governing Tests
+
+The architecture must continue to answer **yes** to all of the following:
+
+1. Can an outside developer install the public M2Oath packages and construct a Trust Container without receiving proprietary M2Oath server implementation?
+2. Can `m2oath-trust` evolve its registration, behavioral-trust algorithms, persistence, and hosted services without forcing those implementations into the public Trust Container runtime?
+3. Can a new Trusted Domain be added through the server-side domain interface without modifying the generic Trust Container or M2Oath core trust architecture?
+4. Can M2Oath Trust and Trusted Domain services supply authoritative inputs without gaining the ability to bypass `ProtectedOperationExecutor`?
+5. Can the public and proprietary packages eventually be moved into separate repositories without redesigning their contracts?
+
+The answer to all five must remain **yes**.
+

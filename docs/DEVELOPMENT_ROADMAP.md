@@ -2,26 +2,37 @@
 
 **Document Type:** Engineering Development Roadmap  
 **Status:** Active  
-**Date:** 2026-09-08  
+**Date:** 2026-09-09  
 **Repository:** `m2oath-web`  
-**Current Checkpoint:** Phase 6 implementation green; next Git checkpoint pending  
+**Current Checkpoint:** Phase 8 IN PROGRESS — Developer OIDC/session, canonical Developer Account, Developer→Agent ownership, and ownership-scoped Agent UX proven; architecture now separates the public Trust Container runtime from proprietary M2Oath Trust and Trusted Domain services  
 **Related Documents:** `docs/WEBSITE_REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/ARCHITECTURE_DECISIONS.md`
 
 ---
 
 ## 1. Purpose
 
-This roadmap defines the ordered implementation path for the M2Oath hosted web platform.
+This roadmap defines the ordered implementation path for the M2Oath hosted product and the transition to the long-term M2Oath Trust architecture.
 
-It translates the product requirements and engineering architecture into development phases while preserving the boundary between:
+It translates product requirements and engineering architecture into development phases while preserving three distinct system responsibilities:
 
 ```text
 m2oath-agent
-    reusable open-source M2Oath framework
+    public/npm developer framework
+    constructs and runs AI Trust Containers
+    owns local protected-operation enforcement
 
-m2oath-web
-    M2Oath-operated hosted platform
+m2oath-trust
+    proprietary server-side trust platform
+    registration, canonical identity, lifecycle,
+    behavioral/accumulated trust, provenance,
+    policy services, credentials, persistence, APIs
+
+Trusted Domain services
+    domain-specific evidence and semantics
+    m2oath-weather is the first reference domain
 ```
+
+These components may be developed in the same repository temporarily. Repository co-location is a development convenience, not an architectural coupling. Package and dependency boundaries must permit `m2oath-agent` and `m2oath-trust` to be physically separated later without redesign.
 
 The roadmap is implementation-oriented. It should be updated as milestones are completed or architectural decisions change.
 
@@ -29,15 +40,34 @@ The roadmap is implementation-oriented. It should be updated as milestones are c
 
 ## 2. Governing Development Principle
 
-Every phase must preserve:
+Every phase must preserve the separation between server-side authority inputs and local protected-operation enforcement.
 
-> **The hosted platform is a management and observation surface over M2Oath authority. It is not a replacement authority system.**
+```text
+                         @m2oath/agent
+                      AI TRUST CONTAINER
+                              │
+                    policy + ALLOW / DENY
+                              │
+                    ProtectedOperationExecutor
+                              │
+══════════════════════════════╪══════════════════════════════
+                       NETWORK BOUNDARY
+══════════════════════════════╪══════════════════════════════
+                              │
+                 ┌────────────┴────────────┐
+                 ▼                         ▼
+            m2oath-trust             Trusted Domains
+         proprietary service       domain evidence/semantics
+```
 
-The web platform may request, orchestrate, display, and manage authoritative operations.
+`m2oath-trust` is authoritative for M2Oath server-side identity, lifecycle, behavioral/accumulated trust, provenance, and related trust state.
 
-Identity, authentication, authorization, trust, policy, and protected execution remain behind authoritative M2Oath boundaries.
+Trusted Domain servers are authoritative for evidence and semantics within their domains.
 
----
+The AI Trust Container remains authoritative for local policy evaluation and final protected-operation enforcement for its encapsulated Agent.
+
+Neither M2Oath Trust nor a Trusted Domain server may bypass `ProtectedOperationExecutor`.
+
 
 ## 3. Current Platform Baseline
 
@@ -478,15 +508,100 @@ Phase 6 coding is complete.
 
 # Phase 7 — Persistent Control-Plane State
 
-**Status:** PLANNED
+**Status:** COMPLETE
 
 ## Goal
 
-Replace process-local state with persistent authoritative storage.
+Replace process-local hosted control-plane state with persistent authoritative
+storage while preserving M2Oath service authority.
+
+## Persistence Foundation — COMPLETE
+
+The required persistence architecture was initially implemented in the
+`m2oath-agent` repository through `@m2oath/persistence-mysql`.
+
+This implementation remains valid completed engineering work. Under the governing
+architecture, however, server-side persistence belongs long-term to proprietary
+`m2oath-trust`, not to the public Trust Container SDK. Its current repository
+location is transitional and must not be treated as the permanent public package
+boundary.
+
+Checkpoint:
+
+```text
+75b9e58  Update 09-08-2026 2:16pm
+```
+
+The reusable package persists:
+
+- canonical Agent identity;
+- lifecycle state;
+- external identity bindings;
+- cryptographic bindings;
+- registration provenance;
+- lifecycle audit evidence;
+- general Agent audit evidence; and
+- factual usage/outcome history.
+
+It also provides atomic enrollment and cryptographic-rotation persistence
+boundaries and real-MySQL control-plane reconstruction coverage.
+
+## Hosted Control-Plane Integration — COMPLETE
+
+The hosted control plane now consumes the reusable MySQL persistence boundary
+through `@m2oath/persistence-mysql`.
+
+Canonical Agent registration and lifecycle state are persisted through
+authoritative M2Oath services and durable MySQL transaction boundaries.
+
+The hosted Agent list and detail paths no longer depend on a process-local
+directory or duplicate hosted copy of Agent identity state. They read through
+the domain-neutral `AgentIdentityDirectory` boundary backed by
+`MysqlAgentIdentityStore`.
+
+The hosted architecture is now:
+
+```text
+Developer / Agent Apps
+        |
+        v
+Shared Hosted Control Plane
+        |
+        v
+Authoritative M2Oath Services
+        |
+        v
+@m2oath/persistence-mysql
+        |
+        v
+Hosted MySQL Infrastructure
+```
+
+## Restart-Survival Proof — COMPLETE
+
+A real-MySQL hosted integration test proves that registered Agent state survives
+hosted control-plane reconstruction. The test registers an Agent through the
+hosted registration gateway, creates a fresh hosted composition against the same
+MySQL database, and verifies that both Agent detail and Agent list reconstruct
+the same canonical Agent from durable state.
+
+Hosted integration validation:
+
+```text
+@m2oath/control-plane
+    hosted restart-survival integration
+    1 test file / 1 test passed
+
+Proven:
+    - hosted registration persists canonical Agent state in MySQL
+    - a fresh hosted composition reconstructs Agent detail
+    - a fresh hosted composition reconstructs the Agent list
+    - hosted Agent reads do not depend on process-local identity state
+```
 
 ## Requirements
 
-Persistence must support at least:
+Hosted persistence supports:
 
 - canonical Agent identity;
 - lifecycle state;
@@ -495,11 +610,12 @@ Persistence must support at least:
 - registration provenance;
 - lifecycle audit evidence.
 
-Future persistence must support:
+The persistence implementation also supports factual usage/outcome history.
+Future `m2oath-trust` persistence/read models must support, as the corresponding
+M2Oath contracts mature:
 
-- usage/outcome history;
 - behavioral evidence;
-- trust state;
+- derived/reconstructable trust state where appropriate;
 - policy evidence;
 - Trusted Domain references.
 
@@ -507,57 +623,238 @@ Future persistence must support:
 
 Persistence is an implementation behind authoritative M2Oath services.
 
-The database itself must not become the policy or execution authority.
+The database itself does not become identity-policy, authorization, trust,
+policy, or protected-operation execution authority.
 
-## Exit Criteria
+## Exit Criteria — SATISFIED
 
-Restarting the control plane does not lose registered Agent state.
+Reconstructing the hosted control plane does not lose registered Agent state or
+require previous process-local hosted directory objects to recover canonical
+identity and lifecycle data.
 
 ---
 
-# Phase 8 — Developer Login, OIDC, and Session Experience
+# Phase 8 — Developer Login, OIDC, Session, and Agent Ownership Experience
 
-**Status:** PLANNED — CONTROL-PLANE FOUNDATION COMPLETE
+**Status:** IN PROGRESS — CORE INTERACTIVE FLOW PROVEN
 
 ## Goal
 
-Replace the current configured server-side Developer-token seam with a real interactive Developer authentication/session experience without changing the Phase 6 control-plane security boundary.
+Replace the configured server-side Developer-token seam with a real interactive Developer authentication/session experience and establish the M2Oath-owned Developer Account and Developer→Agent ownership model without weakening the request-scoped control-plane security boundary.
 
-## Already Proven in Phase 6
+## Implemented / Proven
 
-```text
-Bearer credential
-    ↓
-M2Oath JWT verification
-    ↓
-Authenticated Developer principal
-    ↓
-Exact-principal lifecycle authorization
-    ↓
-agent.create
-```
-
-Authentication and authorization failures already preserve 401/403 semantics, and Developer credentials remain separate from Agent Runtime credentials.
-
-## Remaining Work
+The current implementation proves:
 
 ```text
 Developer Browser
     ↓
-OIDC Login
+Auth0 / OIDC Login
     ↓
 Developer Session / Short-Lived Credential
     ↓
 Developer Nuxt Server
     ↓
-existing request-scoped control-plane authentication boundary
+request-scoped Developer Bearer JWT
+    ↓
+Hosted Control Plane
+    ↓
+canonical M2Oath Developer Account
+    ↓
+Developer-authorized Agent registration
+    ↓
+canonical Agent
+    ↓
+Developer → Agent owner relationship
+    ↓
+ownership-scoped Agent list/detail
 ```
 
-The login/session layer must not place Developer credentials in enrollment payloads or convert JWT scopes into automatic M2Oath authority.
+The manual browser acceptance flow has proven:
+
+- signed-out Developer home;
+- Auth0 sign-in;
+- stable canonical M2Oath Developer Account resolution;
+- Developer dashboard;
+- initially empty ownership-scoped Agent list;
+- Agent registration;
+- canonical Agent creation;
+- persisted Developer→Agent `owner` relationship;
+- ownership-scoped Agent detail;
+- ownership-scoped My Agents list; and
+- sign-out/sign-in with the owned Agent still visible.
+
+The Developer Account is a M2Oath-owned application/domain identity and remains distinct from the Auth0 identity and from canonical Agent identity.
+
+Developer roles and status are M2Oath-owned state, not authority inferred directly from Auth0 claims.
+
+## Remaining Work
+
+1. automate the Developer→Agent ownership acceptance flow;
+2. close the registration recovery/idempotency gap where Agent creation could succeed before ownership persistence fails;
+3. replace the temporary configured-subject Agent lifecycle authorization seam with Developer-account/role/policy authorization;
+4. polish login/signup behavior, including signup and login hints where appropriate;
+5. add remaining negative/security tests and route/session UX cleanup; and
+6. update final Phase 8 documentation and run the full workspace checkpoint.
+
+## Security Constraint
+
+The login/session layer must not place Developer credentials in enrollment payloads, reuse Developer credentials as Agent Runtime credentials, or convert JWT scopes into automatic M2Oath authority.
+
+## Architectural Interpretation
+
+The current hosted `apps/control-plane` is an implementation/prototype predecessor of the future proprietary `m2oath-trust` service. Phase 8 should be completed in place before a physical repository/service extraction is attempted.
 
 ---
 
-# Phase 9 — Agent Identity and Provenance Experience
+
+# Phase 9 — Public Trust Container / Proprietary Trust Service Separation
+
+**Status:** PLANNED — ARCHITECTURAL DECISION ACCEPTED
+
+## Goal
+
+Turn the newly established architecture into enforceable package and service boundaries without prematurely forcing a physical repository split.
+
+The target architecture is:
+
+```text
+PUBLIC / npm
+@m2oath/agent
+    AI Trust Container runtime
+    protected-operation enforcement
+    trust/evidence provider contracts
+    executable trust-rule/policy contracts
+    portable integration adapters
+
+                    authenticated APIs
+                           │
+═══════════════════════════╪════════════════════════════════
+                    NETWORK BOUNDARY
+═══════════════════════════╪════════════════════════════════
+                           │
+              ┌────────────┴─────────────┐
+              ▼                          ▼
+       PROPRIETARY M2OATH          TRUSTED DOMAINS
+          m2oath-trust             m2oath-weather
+                                   future domains
+```
+
+## Work Track A — Package Classification
+
+Inventory the existing M2Oath packages, classes, stores, services, and examples and classify each as:
+
+```text
+PUBLIC TRUST CONTAINER
+PROPRIETARY TRUST SERVICE
+SHARED CONTRACT
+```
+
+Do not rewrite working implementations merely because their current physical location is transitional.
+
+## Work Track B — Dependency Direction
+
+Establish enforceable dependency rules:
+
+- public `m2oath-agent` packages must not depend on proprietary `m2oath-trust` implementations;
+- public packages must not depend on server-side persistence implementations;
+- public packages must not depend on Trusted Domain server implementations;
+- proprietary services may implement or consume stable public/shared contracts where appropriate; and
+- introduce a separate shared-contract package only if actual dependency pressure demonstrates that it is necessary.
+
+## Work Track C — M2Oath Trust Service Boundary
+
+Establish `m2oath-trust` as the long-term home for server-side concerns including:
+
+- Developer accounts and ownership relationships;
+- Agent registration and canonical identity authority;
+- lifecycle management;
+- credential and cryptographic-binding management;
+- behavioral evidence/history;
+- accumulated-trust computation/state;
+- provenance and audit;
+- hosted policy management/distribution;
+- persistence/database adapters;
+- authenticated service APIs; and
+- administration/commercial service concerns.
+
+## Work Track D — Trusted Domain Controller Interface
+
+Define and implement a domain-neutral server-side interface and registry through which Trusted Domain controllers can be added without modifying M2Oath core trust logic.
+
+Conceptual contract:
+
+```ts
+export interface TrustedDomainController<TRequest, TEvidence> {
+  readonly domain: string
+
+  getEvidence(request: TRequest): Promise<TEvidence>
+}
+```
+
+The exact API is an implementation decision for this phase.
+
+Required properties:
+
+- domain controllers own domain-specific evidence and semantics;
+- evidence includes appropriate provenance;
+- adding a new domain does not add domain-specific conditionals to generic M2Oath trust code;
+- domain controllers never gain protected-operation execution authority;
+- M2Oath-hosted and third-party domains can use the same architectural seam; and
+- `m2oath-weather` becomes the first reference implementation.
+
+## Work Track E — Trust Container Network Inputs
+
+Preserve the two explicit Trust Container trust-input paths:
+
+```text
+m2oath-trust
+    ↓
+AgentTrustStateProvider
+    ↓
+AgentTrustState
+    ──────────────┐
+                  │
+                  ▼
+             Trust Policy
+                  ▲
+                  │
+Trusted Domain    │
+    ↓             │
+ExternalTrustEvidenceProvider<T>
+    ↓
+TEvidence
+    ──────────────┘
+```
+
+Executable TypeScript rules evaluate Agent trust state, domain evidence, and operation context as configured. Rules decide; `ProtectedOperationExecutor` enforces.
+
+## Repository Strategy
+
+`m2oath-agent` and `m2oath-trust` may remain in one repository during this phase.
+
+The governing requirement is independent extractability, not immediate physical separation.
+
+The existing `mcp-workspace` may later host/deploy `m2oath-trust` and `m2oath-weather`, but it must not be modified until these package and service boundaries are proven.
+
+## Exit Criteria
+
+Phase 9 is complete when:
+
+1. existing code is classified by long-term ownership;
+2. dependency direction is documented and enforced;
+3. public Trust Container packages have no proprietary implementation dependencies;
+4. the `m2oath-trust` server responsibility is explicit in code/package composition;
+5. the Trusted Domain controller interface/registry exists;
+6. Weather can integrate through the generic domain seam;
+7. Trust Container network/provider contracts are explicit;
+8. working registration/lifecycle/persistence behavior survives the separation unchanged; and
+9. the eventual repository split can be performed as an extraction rather than a redesign.
+
+---
+
+
+# Phase 10 — Agent Identity and Provenance Experience
 
 **Status:** PLANNED
 
@@ -588,7 +885,7 @@ It must not infer or manufacture lifecycle or cryptographic state.
 
 ---
 
-# Phase 10 — Lifecycle Operations
+# Phase 11 — Lifecycle Operations
 
 **Status:** PLANNED
 
@@ -634,7 +931,7 @@ only when their semantics are fully implemented.
 
 ---
 
-# Phase 11 — Agent Runtime Authentication Visibility
+# Phase 12 — Agent Runtime Authentication Visibility
 
 **Status:** PLANNED
 
@@ -677,7 +974,7 @@ Private key material must never be displayed or transmitted as ordinary manageme
 
 ---
 
-# Phase 12 — Behavior and Usage
+# Phase 13 — Behavior and Usage
 
 **Status:** PLANNED
 
@@ -704,7 +1001,7 @@ Behavioral records should not be rewritten as authoritative trust conclusions in
 
 ---
 
-# Phase 13 — Accumulated Agent Trust
+# Phase 14 — Accumulated Agent Trust
 
 **Status:** PLANNED
 
@@ -739,7 +1036,7 @@ It does not calculate the authoritative trust state.
 
 ---
 
-# Phase 14 — Evidence
+# Phase 15 — Evidence
 
 **Status:** PLANNED
 
@@ -773,7 +1070,7 @@ Expose evidence in ways that support understanding of:
 
 ---
 
-# Phase 15 — Policy Outcomes
+# Phase 16 — Policy Outcomes
 
 **Status:** PLANNED
 
@@ -807,9 +1104,9 @@ Policy does not gain protected-operation execution authority.
 
 ---
 
-# Phase 16 — Trusted Domains
+# Phase 17 — Trusted Domains Product Experience
 
-**Status:** PLANNED
+**Status:** PLANNED — SERVER INTERFACE ESTABLISHED EARLIER IN PHASE 9
 
 ## Future Route
 
@@ -819,29 +1116,37 @@ Policy does not gain protected-operation execution authority.
 
 ## Goal
 
-Display external/domain evidence relevant to Agent operations while preserving the domain-neutral M2Oath boundary.
+Display external/domain evidence relevant to Agent operations while preserving the domain-neutral M2Oath boundary established by the server-side Trusted Domain controller interface.
 
 ## Architecture
 
 ```text
-Domain Provider
+Trusted Domain Server
     ↓
-Domain Evidence
+TrustedDomainController
+    ↓
+domain evidence + provenance
+    ↓
+network/service boundary
     ↓
 ExternalTrustEvidenceProvider<T>
     ↓
-M2Oath Policy
+Trust Container Policy
     ↓
 ALLOW / DENY
+    ↓
+ProtectedOperationExecutor
 ```
 
 ## Governing Principle
 
-> **Domain systems determine the meaning and quality of evidence within their domains. M2Oath determines whether the agent may execute.**
+> **Domain systems determine the meaning and quality of evidence within their domains. The AI Trust Container determines whether the Agent may execute under its configured M2Oath policy.**
+
+The product experience must not imply that a domain server or `m2oath-trust` remotely executes the protected Agent operation.
 
 ---
 
-# Phase 17 — Weather Trusted Domain
+# Phase 18 — Weather Trusted Domain
 
 **Status:** PLANNED
 
@@ -881,13 +1186,15 @@ Historical Accuracy
 
 ## Constraint
 
-Weather remains a reference/domain integration.
+Weather remains the first reference Trusted Domain.
 
-Weather logic must not leak into generic M2Oath identity, authorization, or trust-container code.
+Weather must integrate through the generic Trusted Domain controller/provider seams. Weather logic must not leak into generic M2Oath identity, authorization, behavioral-trust, accumulated-trust, policy, or Trust Container code.
+
+The Weather server remains authoritative for Weather evidence and Weather-specific trust semantics. It does not become protected-operation execution authority.
 
 ---
 
-# Phase 18 — KPIs and Operations
+# Phase 19 — KPIs and Operations
 
 **Status:** PLANNED
 
@@ -917,7 +1224,7 @@ The UI must distinguish factual operational metrics from trust interpretation.
 
 ---
 
-# Phase 19 — Public Product Foundation
+# Phase 20 — Public Product Foundation
 
 **Status:** PLANNED
 
@@ -947,7 +1254,7 @@ The site should explain the category before requiring implementation knowledge.
 
 ---
 
-# Phase 20 — Public Developer Documentation
+# Phase 21 — Public Developer Documentation
 
 **Status:** STARTED / PLANNED EXPANSION
 
@@ -974,7 +1281,7 @@ Internal engineering documents in root `docs/` should be distilled into stable p
 
 ---
 
-# Phase 21 — Interactive Trust Demonstration
+# Phase 22 — Interactive Trust Demonstration
 
 **Status:** PLANNED
 
@@ -1002,7 +1309,7 @@ The demo must not imply that the Agent grants itself authority.
 
 ---
 
-# Phase 22 — Trust Laboratory
+# Phase 23 — Trust Laboratory
 
 **Status:** FUTURE
 
@@ -1026,7 +1333,7 @@ This phase should wait until the underlying trust simulation and benchmark work 
 
 ---
 
-# Phase 23 — SaaSKamp Experience
+# Phase 24 — SaaSKamp Experience
 
 **Status:** FUTURE
 
@@ -1065,7 +1372,7 @@ Open-source contribution does not automatically create equity or investment righ
 
 ---
 
-# Phase 24 — Production Hardening
+# Phase 25 — Production Hardening
 
 **Status:** FUTURE
 
@@ -1096,7 +1403,7 @@ Production hardening must be treated as an explicit phase rather than inferred f
 
 ---
 
-# Phase 25 — Branding and Shared Presentation System
+# Phase 26 — Branding and Shared Presentation System
 
 **Status:** DEFERRED
 
@@ -1128,24 +1435,31 @@ Shared packages should be introduced only where reuse is real.
 The current ordered engineering queue is:
 
 ```text
-1. Automated Developer → Control Plane → Agent acceptance test
-2. Stable m2oath-web → m2oath-agent integration design
-3. Authoritative M2Oath agent.create / enrollment
-4. Persistent identity/lifecycle storage
-5. Developer authentication and authorization
-6. Identity + provenance + cryptographic binding UI
-7. rotate-key and disable lifecycle operations
-8. Agent runtime authentication visibility
-9. Behavior / usage
-10. Accumulated trust
-11. Evidence
-12. Policy
-13. Trusted Domains
-14. Weather Trusted Domain
-15. KPIs / operations
+1. Finish Phase 8 Developer OIDC/session/ownership acceptance coverage
+2. Close Agent-registration ownership recovery/idempotency gap
+3. Replace temporary configured-subject authorization seam
+4. Phase 8 authentication/signup/security cleanup and full checkpoint
+5. Classify existing code: PUBLIC TRUST CONTAINER / PROPRIETARY TRUST SERVICE / SHARED CONTRACT
+6. Establish m2oath-agent ↔ m2oath-trust dependency and API boundaries
+7. Define TrustedDomainController interface and registry
+8. Prove m2oath-weather through the generic domain seam
+9. Extract/recompose server-side registration/lifecycle/persistence under m2oath-trust ownership
+10. Agent identity + provenance + cryptographic binding UI
+11. rotate-key and disable lifecycle operations
+12. Agent runtime authentication visibility
+13. Behavior / usage
+14. Accumulated trust
+15. Evidence
+16. Policy outcomes
+17. Trusted Domain product experience
+18. Weather Trusted Domain product experience
+19. KPIs / operations
+20. Pre-publication physical repository separation
 ```
 
-This order intentionally establishes identity and authority before building richer trust visualizations.
+This order finishes the currently proven Developer workflow first, then establishes the package/network architecture before richer trust-product work.
+
+The physical repository split is intentionally later than the architectural and package split.
 
 ---
 
@@ -1172,7 +1486,7 @@ Meaningful architectural milestones should be committed and pushed before beginn
 
 # Definition of Done for the Current Foundation
 
-The initial hosted-platform foundation is complete when all of the following are true:
+The original hosted-platform foundation is complete:
 
 - separate `m2oath-web` repository exists;
 - Public, Developer, Agent, Docs, and Control Plane applications exist;
@@ -1180,12 +1494,13 @@ The initial hosted-platform foundation is complete when all of the following are
 - canonical Agent identity is server-owned;
 - browser/URL identity is treated as input rather than authority;
 - typed control-plane client exists;
-- Developer → Agent flow is automated by acceptance test;
-- temporary identity issuance is clearly marked as temporary;
-- authoritative M2Oath integration boundary is designed;
-- workspace regression remains green.
+- Developer → Agent identity flow has automated acceptance coverage;
+- authoritative M2Oath enrollment is integrated;
+- durable MySQL-backed Agent state is integrated;
+- hosted control-plane reconstruction preserves canonical Agent state; and
+- workspace regression has remained green at completed architectural checkpoints.
 
-At the current `5cc41ca` checkpoint, all items are complete **except** the automated cross-application acceptance test and the final authoritative M2Oath integration design.
+The active foundation work has moved to Phase 8 Developer identity/session/ownership completion and the Phase 9 public Trust Container / proprietary Trust Service separation.
 
 ---
 
@@ -1193,7 +1508,7 @@ At the current `5cc41ca` checkpoint, all items are complete **except** the autom
 
 Do not optimize the hosted UI ahead of the authority architecture.
 
-The implementation order should remain:
+The implementation order should preserve:
 
 ```text
 Identity
@@ -1213,20 +1528,32 @@ Policy
 Protected Execution Visibility
 ```
 
-while preserving the actual M2Oath execution boundary:
+while preserving the actual distributed M2Oath architecture:
 
 ```text
-Authenticate
-    ↓
-Resolve Canonical Identity
-    ↓
-Authorize
-    ↓
-Evaluate Trust
-    ↓
-ALLOW / DENY
-    ↓
-Trust Container Enforcement
+                 M2Oath Trust State
+                        │
+                        │
+Trusted Domain Evidence┼──────┐
+                        │      │
+                        ▼      ▼
+                 AI Trust Container
+                        │
+             Executable TypeScript Rules
+                        │
+                   ALLOW / DENY
+                        │
+                        ▼
+             ProtectedOperationExecutor
+                        │
+                 only if permitted
+                        ▼
+                Encapsulated Agent
 ```
 
+The public Trust Container, proprietary M2Oath Trust service, and Trusted Domain services have different authorities and must remain independently evolvable.
+
 The website should make M2Oath easier to use and understand without becoming the system that silently replaces M2Oath authority.
+
+Before public npm/repository boundaries are finalized, `m2oath-agent` and proprietary `m2oath-trust` must be physically separable without architectural redesign.
+
