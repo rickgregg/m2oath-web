@@ -1,18 +1,55 @@
 import {
   createRemoteJwtAuthenticationProvider
 } from '@m2oath/auth-jwt'
+
 import {
-  InMemoryAgentDirectory
+  checkMysqlPersistenceConnection,
+  createMysqlPersistencePool
+} from '@m2oath/persistence-mysql'
+
+import {
+  M2OathAgentDirectory
 } from './agent-store.js'
+
 import {
-  createM2OathHostedComposition
-} from './m2oath-composition.js'
+  createDurableM2OathHostedComposition
+} from './m2oath-durable-composition.js'
+
 import {
   M2OathAgentRegistrationGateway
 } from './m2oath-agent-registration-gateway.js'
+
+import {
+  HostedAgentRegistrationService
+} from './hosted-agent-registration-service.js'
+
+import {
+  DeveloperOwnedAgentService
+} from './developer-owned-agent-service.js'
+
 import {
   createControlPlaneServer
 } from './server.js'
+
+import {
+  DeveloperAccountService
+} from './developer/developer-account-service.js'
+
+import {
+  DeveloperAccountGateway
+} from './developer/developer-account-gateway.js'
+
+import {
+  MysqlDeveloperAccountStore
+} from './developer/mysql-developer-account-store.js'
+
+import {
+  DeveloperAgentRelationshipService
+} from './developer/developer-agent-relationship-service.js'
+
+import {
+  MysqlDeveloperAgentRelationshipStore
+} from './developer/mysql-developer-agent-relationship-store.js'
 
 const port = Number(
   process.env.M2OATH_CONTROL_PLANE_PORT ?? 4000
@@ -38,6 +75,42 @@ const authorizedDeveloperSubject =
     'M2OATH_DEVELOPER_JWT_SUBJECT'
   )
 
+const mysqlHost =
+  requireEnvironmentVariable(
+    'M2OATH_MYSQL_HOST'
+  )
+
+const mysqlPort =
+  Number(
+    requireEnvironmentVariable(
+      'M2OATH_MYSQL_PORT'
+    )
+  )
+
+const mysqlDatabase =
+  requireEnvironmentVariable(
+    'M2OATH_MYSQL_DATABASE'
+  )
+
+const mysqlUser =
+  requireEnvironmentVariable(
+    'M2OATH_MYSQL_USER'
+  )
+
+const mysqlPassword =
+  requireEnvironmentVariable(
+    'M2OATH_MYSQL_PASSWORD'
+  )
+
+if (
+  !Number.isInteger(mysqlPort) ||
+  mysqlPort <= 0
+) {
+  throw new Error(
+    'M2OATH_MYSQL_PORT must be a positive integer'
+  )
+}
+
 const authenticationProvider =
   createRemoteJwtAuthenticationProvider({
     issuer: developerJwtIssuer,
@@ -45,11 +118,21 @@ const authenticationProvider =
     jwksUri: developerJwtJwksUri
   })
 
-const directory =
-  new InMemoryAgentDirectory()
+const pool =
+  createMysqlPersistencePool({
+    host: mysqlHost,
+    port: mysqlPort,
+    database: mysqlDatabase,
+    user: mysqlUser,
+    password: mysqlPassword
+  })
+
+await checkMysqlPersistenceConnection(
+  pool
+)
 
 const m2oath =
-  createM2OathHostedComposition({
+  createDurableM2OathHostedComposition({
     authenticationProvider,
 
     developerPrincipals: [
@@ -58,19 +141,70 @@ const m2oath =
         subject: authorizedDeveloperSubject,
         issuer: developerJwtIssuer
       }
-    ]
+    ],
+
+    pool
+  })
+
+const directory =
+  new M2OathAgentDirectory(
+    m2oath.identityDirectory
+  )
+
+const developerAccountStore =
+  new MysqlDeveloperAccountStore(
+    pool
+  )
+
+const developerAccountService =
+  new DeveloperAccountService(
+    developerAccountStore
+  )
+
+const developerAccountGateway =
+  new DeveloperAccountGateway(
+    authenticationProvider,
+    developerAccountService
+  )
+
+const developerAgentRelationshipStore =
+  new MysqlDeveloperAgentRelationshipStore(
+    pool
+  )
+
+const developerAgentRelationshipService =
+  new DeveloperAgentRelationshipService({
+    store:
+      developerAgentRelationshipStore
   })
 
 const registrationGateway =
   new M2OathAgentRegistrationGateway({
-    sdk: m2oath.sdk,
-    directory
+    sdk: m2oath.sdk
+  })
+
+const hostedRegistrationService =
+  new HostedAgentRegistrationService({
+    developerAccountGateway,
+    registrationGateway,
+    relationshipService:
+      developerAgentRelationshipService
+  })
+
+const developerOwnedAgentService =
+  new DeveloperOwnedAgentService({
+    directory,
+    relationshipService:
+      developerAgentRelationshipService
   })
 
 const server =
   createControlPlaneServer({
     registrationGateway,
-    directory
+    directory,
+    developerAccountGateway,
+    hostedRegistrationService,
+    developerOwnedAgentService
   })
 
 server.listen(port, () => {

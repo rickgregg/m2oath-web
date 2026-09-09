@@ -25,3 +25,26 @@ export interface RegisterAgentRequest {
 export interface RegisterAgentResponse {
   agent: AgentSummary
 }
+
+export type DeveloperRole =
+  | 'developer'
+  | 'admin'
+
+export type DeveloperAccountStatus =
+  | 'active'
+  | 'disabled'
+
+export interface DeveloperAccountSummary {
+  developerId: string
+  displayName?: string
+  status: DeveloperAccountStatus
+  role: DeveloperRole
+}
+
+export interface BootstrapDeveloperSessionRequest {
+  displayName?: string
+}
+
+export interface BootstrapDeveloperSessionResponse {
+  developer: DeveloperAccountSummary
+}

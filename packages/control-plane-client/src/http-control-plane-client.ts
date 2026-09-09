@@ -1,6 +1,8 @@
 import type { ControlPlaneClient } from './control-plane-client.js'
 import type {
   AgentSummary,
+  BootstrapDeveloperSessionRequest,
+  BootstrapDeveloperSessionResponse,
   RegisterAgentRequest,
   RegisterAgentResponse
 } from './types.js'
@@ -37,6 +39,21 @@ export class HttpControlPlaneClient implements ControlPlaneClient {
         : undefined
   }
 
+  async bootstrapDeveloperSession(
+    request: BootstrapDeveloperSessionRequest = {}
+  ): Promise<BootstrapDeveloperSessionResponse> {
+    return this.request<BootstrapDeveloperSessionResponse>(
+      '/v1/developers/session',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      }
+    )
+  }
+
   async registerAgent(
     request: RegisterAgentRequest
   ): Promise<RegisterAgentResponse> {
@@ -57,6 +74,20 @@ export class HttpControlPlaneClient implements ControlPlaneClient {
 
   async listAgents(): Promise<AgentSummary[]> {
     return this.request<AgentSummary[]>('/v1/agents')
+  }
+
+  async getMyAgent(
+    agentId: string
+  ): Promise<AgentSummary> {
+    return this.request<AgentSummary>(
+      `/v1/developers/me/agents/${encodeURIComponent(agentId)}`
+    )
+  }
+
+  async listMyAgents(): Promise<AgentSummary[]> {
+    return this.request<AgentSummary[]>(
+      '/v1/developers/me/agents'
+    )
   }
 
   private async request<T>(

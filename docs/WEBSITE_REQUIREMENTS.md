@@ -2,9 +2,9 @@
 
 **Document Type:** Product, Information Architecture, and Developer
 Experience Requirements\
-**Status:** Draft V0.3 — Authoritative Website Source of Truth\
-**Date:** 2026-09-07\
-**Primary Product:** M2Oath Machine Authority Platform\
+**Status:** Draft V0.4 — Authoritative Website Source of Truth\
+**Date:** 2026-09-09\
+**Primary Product:** M2Oath Machine Authority Platform — public AI Trust Container + proprietary Trust Service + Trusted Domains\
 **Related Ecosystem:** SaaSKamp\
 **Proposed Web Stack:** Nuxt + VitePress
 
@@ -39,6 +39,45 @@ M2Oath surrounds an AI agent with an **AI Trust Container** that
 controls access to protected operations using identity, authorization,
 accumulated behavioral trust, trusted domain evidence, provenance,
 lifecycle state, and programmable policy.
+
+### Governing Product and Network Architecture
+
+The website must present three distinct architectural roles:
+
+```text
+PUBLIC / npm / open source
+@m2oath/agent
+    Developer toolkit for constructing AI Trust Containers
+    local policy evaluation
+    protected-operation enforcement
+
+                authenticated APIs
+================ NETWORK BOUNDARY ================
+
+PROPRIETARY SERVER PLATFORM
+m2oath-trust
+    Developer accounts
+    Agent registration and canonical identity
+    lifecycle / credentials / bindings
+    behavioral evidence and accumulated trust
+    provenance / audit
+    persistence
+    policy services
+    Trusted Domain controller registry
+
+TRUSTED DOMAIN SERVERS
+m2oath-weather + future domains
+    domain facts
+    verification
+    domain-specific evidence and semantics
+```
+
+The website must not collapse these roles into one undifferentiated
+“M2Oath server.” The public Trust Container can be used independently of
+M2Oath-hosted website code. Hosted `m2oath-trust` services provide authoritative
+M2Oath server state and trust inputs. Trusted Domains provide authoritative
+domain evidence. The AI Trust Container remains the final local
+protected-operation enforcement boundary.
 
 ------------------------------------------------------------------------
 
@@ -212,67 +251,86 @@ application even when both are routed under `developer.m2oath.com`.
 
 ------------------------------------------------------------------------
 
-## 4. Repository and Hosted Platform Structure
+## 4. Repository, Package, and Hosted Service Structure
 
-The M2Oath hosted web platform is maintained in a repository that is intentionally separate from the open-source M2Oath framework.
+The M2Oath architecture distinguishes **product/package boundaries** from
+temporary repository placement.
 
-``` text
-m2oath-agent/
-    Open-source M2Oath framework
-    npm packages and reusable integrations
+The durable product boundary is:
 
-m2oath-web/
-    M2Oath-operated hosted web platform
+```text
+@m2oath/agent
+    public / npm / open source
+    Trust Container runtime and contracts
+
+m2oath-trust
+    proprietary server-side trust/control services
+
+m2oath-weather + future Trusted Domains
+    domain-specific evidence services
+
+m2oath-web
+    M2Oath-operated web applications and product experience
 ```
 
-This separation is an architectural requirement. An outside developer must be able to use `m2oath-agent` without requiring any M2Oath hosted website code. The hosted platform should consume stable public M2Oath packages, APIs, and service boundaries rather than reach into framework internals or duplicate core identity, authorization, trust, or protected-execution logic.
+`m2oath-agent` and server-side trust implementations may temporarily be
+co-located while package boundaries are proven. Co-location is a development
+convenience, not architectural coupling. Before public release, the public
+Trust Container must be independently extractable and must not depend on
+proprietary Trust Service implementations.
+
+An outside developer must be able to construct and run a Trust Container
+without importing M2Oath hosted website code or proprietary server
+implementations.
 
 The current `m2oath-web` structure is:
 
-``` text
+```text
 m2oath-web/
 ├── apps/
-│   ├── web/
-│   │   └── Nuxt public website (`m2oath.com`)
-│   ├── developer/
-│   │   └── Nuxt Developer application (`developer.m2oath.com`)
-│   ├── agent/
-│   │   └── Nuxt Agent application (`agent.m2oath.com`)
-│   ├── control-plane/
-│   │   └── shared server/control-plane API
-│   └── docs/
-│       └── VitePress public developer documentation
+│   ├── web/             Nuxt public website (`m2oath.com`)
+│   ├── developer/       Nuxt Developer application (`developer.m2oath.com`)
+│   ├── agent/           Nuxt Agent application (`agent.m2oath.com`)
+│   ├── control-plane/   current hosted server/API prototype
+│   └── docs/            VitePress public developer documentation
 │
 ├── packages/
 │   └── control-plane-client/
 │       └── typed client used by hosted applications
 │
-├── docs/
-│   └── internal repository architecture, requirements, and engineering documentation
-│
-└── examples or additional shared packages as justified by real reuse
+└── docs/
+    └── internal architecture, requirements, and engineering documentation
 ```
 
-The `apps/docs` directory is the publishable VitePress documentation application. The top-level `docs/` directory contains repository and engineering documentation and is not automatically published.
+The current `apps/control-plane` is a hosted prototype of responsibilities that
+belong long-term to proprietary `m2oath-trust`. Its current repository location
+must not be mistaken for the final package/service boundary.
 
-The Developer and Agent applications are separate Nuxt applications but must observe the same authoritative M2Oath state through a shared control-plane boundary:
+The Developer and Agent applications consume the same authoritative server
+state:
 
-``` text
+```text
 Developer Nuxt / Agent Nuxt
           │
           ▼
-@m2oath/control-plane-client
+Typed Control-Plane / Trust-Service Client
           │
           ▼
-Shared Control-Plane API
+m2oath-trust API boundary
           │
-          ▼
-Authoritative M2Oath Services / Stores
+          ├── canonical identity / lifecycle
+          ├── Developer ownership
+          ├── behavioral trust / history
+          ├── provenance / audit
+          └── persistence
 ```
 
-The current Day 3 implementation proves this boundary with a shared control-plane service and temporary in-memory store. The temporary store and temporary sequential Agent ID issuance are scaffolding only. Production registration must delegate canonical identity issuance, enrollment, lifecycle, authentication, authorization, and trust responsibilities to authoritative M2Oath service/package boundaries.
+Trusted Domain services cross a separate authenticated service boundary and
+remain independent of both presentation applications and the M2Oath trust
+core.
 
-Application-specific UI should remain inside its owning application until reuse is real. Shared UI or brand packages should be introduced only when justified. During the architecture phase, use Nuxt UI defaults and defer custom branding, color, typography, and design-system work so that future visual changes can be centralized without coupling the applications.
+Application-specific UI should remain inside its owning application until reuse
+is real. Shared UI or brand packages should be introduced only when justified.
 
 ------------------------------------------------------------------------
 
@@ -457,20 +515,29 @@ factual evidence over time.
 
 It should distinguish:
 
-``` text
+```text
 Usage / Outcomes / Verification
             │
             ▼
        Factual Evidence
             │
             ▼
-    Aggregation / Weighting
+        m2oath-trust
+ Aggregation / Weighting /
+ Accumulated Trust History
+            │
+            │ AgentTrustStateProvider
+            ▼
+       AI Trust Container
             │
             ▼
-      AgentTrustState
+ Executable Trust Policy
             │
             ▼
-        Trust Policy
+       ALLOW / DENY
+            │
+            ▼
+ ProtectedOperationExecutor
 ```
 
 The website should explain, at a high level:
@@ -520,9 +587,28 @@ The architecture is:
                    ALLOW / DENY
 ```
 
-Domain providers remain authoritative for the evidence they produce.
+Domain providers remain authoritative for the evidence and semantics they
+produce.
 
-M2Oath remains authoritative for the final protected execution decision.
+The server platform must also provide a domain-neutral integration seam for
+adding Trusted Domain controllers/services without modifying the M2Oath trust
+core. Conceptually:
+
+```ts
+export interface TrustedDomainController<TRequest, TEvidence> {
+  readonly domain: string
+
+  getEvidence(request: TRequest): Promise<TEvidence>
+}
+```
+
+A registry may compose Weather, Finance, Logistics, Energy, or third-party
+controllers. A controller supplies domain evidence; it never inherits
+protected-operation execution authority.
+
+M2Oath executable policy determines whether configured requirements are
+satisfied, while the AI Trust Container remains authoritative for final local
+protected-operation enforcement.
 
 ------------------------------------------------------------------------
 
@@ -780,26 +866,27 @@ evidence provider without modifying M2Oath core.
 
 Conceptual model:
 
-``` text
-Your Domain
+```text
+Your Trusted Domain Service
     │
-    ▼
-Domain Data
+    ├── domain data
+    ├── domain verification
+    └── domain trust evidence
     │
-    ▼
-Domain Verification
+    ├──── server integration ────► TrustedDomainController<...>
     │
-    ▼
-Domain Trust Evidence
-    │
-    ▼
-ExternalTrustEvidenceProvider<T>
-    │
-    ▼
-M2Oath Trust Policy
-    │
-    ▼
-ALLOW / DENY
+    └──── container integration ─► ExternalTrustEvidenceProvider<T>
+                                      │
+                                      ▼
+                               AI Trust Container
+                                      │
+                              executable trust policy
+                                      │
+                                      ▼
+                                 ALLOW / DENY
+                                      │
+                                      ▼
+                          ProtectedOperationExecutor
 ```
 
 The documentation must preserve the domain-neutral M2Oath boundary.
@@ -1184,10 +1271,15 @@ API Reference
 ├── @m2oath/agent
 ├── @m2oath/mcp
 ├── @m2oath/auth-jwt
-├── @m2oath/persistence
-├── @m2oath/weather-trust
-└── @m2oath/cli
+├── @m2oath/cli
+├── Trust Service APIs (hosted/proprietary)
+└── Trusted Domain integration contracts
 ```
+
+Public documentation must clearly label which APIs/packages are open-source
+Trust Container components and which are hosted/proprietary service APIs.
+Server persistence implementations and M2Oath-operated domain-service
+implementations must not be presented as required public runtime dependencies.
 
 ------------------------------------------------------------------------
 
@@ -1350,13 +1442,13 @@ Developer Nuxt / Agent Nuxt
 Typed M2Oath API Client
           │
           ▼
-Shared Server / Control-Plane API Boundary
+Shared Server / `m2oath-trust` API Boundary
           │
           ▼
-M2Oath Application Services
+M2Oath Trust / Identity / Lifecycle Services
           │
           ▼
-Identity / Registration / Lifecycle / Trust Stores
+Identity / Registration / Lifecycle / Trust / Audit Persistence
 ```
 
 Initial operations may include:
@@ -1380,6 +1472,11 @@ requests are mediated through Nuxt server routes; the browser does not directly
 issue canonical identity or become the authority for agent state. Route parameters
 such as `/agents/:agentId` are untrusted lookup input, and displayed canonical
 identity must come from the authoritative control-plane response.
+
+Architecturally, `@m2oath/control-plane` is the current hosted implementation
+prototype for responsibilities now classified under proprietary
+`m2oath-trust`. Future extraction or renaming must preserve the API/authority
+boundary rather than duplicating state in the web applications.
 
 ------------------------------------------------------------------------
 
@@ -1630,8 +1727,15 @@ Relevant pages should link to:
 -   security reporting process;
 -   releases.
 
-The website should distinguish open-source M2Oath interfaces from future
-hosted/commercial services.
+The website must distinguish the public/open-source Trust Container from
+hosted/proprietary services.
+
+The primary open-source story is that developers use `@m2oath/agent` to
+construct AI Trust Containers. `m2oath-trust` is the proprietary server-side
+support platform for registration, canonical identity, lifecycle, behavioral
+trust, history, audit/provenance, persistence, and related hosted services.
+Trusted Domain implementations may be M2Oath-operated, partner-operated, or
+third-party.
 
 ------------------------------------------------------------------------
 
@@ -1746,13 +1850,16 @@ rather than inventing a separate web identity system. An agent registered in the
 Developer application must resolve in the Agent application under the same
 server-issued canonical Agent ID.
 
-The initial Day 3 vertical slice has proven the hosted application boundary using
-`@m2oath/control-plane-client` and the shared `@m2oath/control-plane` service:
-Developer registration can create a server-issued agent record and the separate
-Agent application can retrieve that same authoritative record. The current
-in-memory store and sequential development Agent IDs are temporary scaffolding;
-they do not replace M2Oath's authoritative enrollment and identity services.
-Production authentication is not yet implied by this scaffold.
+The hosted implementation has advanced beyond the original Day 3 scaffold.
+Developer OIDC/session handling, canonical Developer Account state,
+Developer-to-Agent ownership, durable Agent registration, and ownership-scoped
+Agent list/detail flows have been interactively proven.
+
+The current `@m2oath/control-plane` process is a prototype of future
+`m2oath-trust`. Remaining hardening includes automated acceptance coverage,
+registration recovery/idempotency, removal of temporary configured-subject
+authorization seams, authentication/signup UX polish, and the planned
+public/private package separation.
 
 ## Phase 4 --- Interactive Demonstration
 
@@ -1861,13 +1968,16 @@ trust history attach.
 
 ### Agent Trust
 
-M2Oath's interpretation of accumulated behavioral evidence under
-applicable policy.
+Accumulated behavioral trust state derived from factual Agent behavior and
+history. Authoritative hosted behavioral history/calculation may be maintained
+by `m2oath-trust`; the Trust Container consumes that state as an input to
+operation-specific executable policy.
 
 ### Trusted Domain
 
-An external/domain system that produces evidence relevant to an
-execution decision while remaining separate from final M2Oath execution
+An independent domain system that remains authoritative for its domain facts,
+verification, evidence, and semantics. It integrates through domain-neutral
+service/provider contracts and does not receive protected-operation execution
 authority.
 
 ### Trusted Action
@@ -1915,6 +2025,14 @@ Disabled Identity != Executable Identity
 
 AI Agent != Trust Container
 
+Public Trust Container != Proprietary Trust Service
+
+m2oath-trust != Trusted Domain
+
+AgentTrustState != Execution Capability
+
+Domain Evidence != Behavioral Trust
+
 M2Oath Core != Weather Domain
 
 M2Oath != SaaSKamp
@@ -1960,11 +2078,17 @@ The website should continually reinforce one simple idea:
 
 The public site explains that idea.
 
-The documentation teaches developers how to build it.
+The documentation teaches developers how to construct the public AI Trust
+Container and integrate it with optional M2Oath Trust and Trusted Domain
+services.
 
-The Developer application lets developers build and register. The Agent application is where registered agents are observed and managed.
+The Developer application lets developers build and register. The Agent
+application is where registered agents are observed and managed. Both consume
+authoritative proprietary `m2oath-trust` services rather than becoming
+independent trust authorities.
 
-Trusted Domains bring reliable real-world evidence into it.
+Trusted Domains bring reliable real-world evidence into the architecture while
+remaining authoritative for their own domain semantics.
 
 SaaSKamp gives people a pathway to learn it, build it, prove it against
 real industry problems, and create the ecosystem around it.

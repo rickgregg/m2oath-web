@@ -1,5 +1,10 @@
 export type {
   AgentSummary,
+  BootstrapDeveloperSessionRequest,
+  BootstrapDeveloperSessionResponse,
+  DeveloperAccountStatus,
+  DeveloperAccountSummary,
+  DeveloperRole,
   RegisterAgentIdentifier,
   RegisterAgentCryptographicMaterial,
   RegisterAgentRequest,

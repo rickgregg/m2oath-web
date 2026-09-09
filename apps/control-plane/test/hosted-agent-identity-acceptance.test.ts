@@ -4,7 +4,7 @@ import {
   HttpControlPlaneClient
 } from '@m2oath/control-plane-client'
 import {
-  InMemoryAgentDirectory
+  M2OathAgentDirectory
 } from '../src/agent-store.js'
 import {
   M2OathAgentRegistrationGateway
@@ -41,18 +41,19 @@ afterEach(async () => {
 
 async function startControlPlane() {
   const server = (() => {
-    const directory =
-      new InMemoryAgentDirectory()
-
     const m2oath =
       createM2OathHostedComposition(
         createTestM2OathAuthenticationOptions()
       )
 
+    const directory =
+      new M2OathAgentDirectory(
+        m2oath.identityDirectory
+      )
+
     const registrationGateway =
       new M2OathAgentRegistrationGateway({
-        sdk: m2oath.sdk,
-        directory
+        sdk: m2oath.sdk
       })
 
     return createControlPlaneServer({

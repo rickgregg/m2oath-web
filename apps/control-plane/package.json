@@ -8,14 +8,17 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "node --watch dist/index.js",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "./test-integration.sh",
+    "test:integration:vitest": "vitest run --no-file-parallelism test/*.integration.test.ts"
   },
   "dependencies": {
     "@m2oath/agent": "file:../../../m2oath-agent/packages/agent",
     "@m2oath/auth-jwt": "file:../../../m2oath-agent/packages/auth-jwt",
     "@m2oath/control-plane-client": "workspace:*",
     "@m2oath/persistence": "file:../../../m2oath-agent/packages/persistence",
-    "@m2oath/sdk": "file:../../../m2oath-agent/packages/sdk"
+    "@m2oath/sdk": "file:../../../m2oath-agent/packages/sdk",
+    "@m2oath/persistence-mysql": "file:../../../m2oath-agent/packages/persistence-mysql"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

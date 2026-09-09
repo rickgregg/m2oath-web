@@ -2,23 +2,25 @@ import type {
   AgentSummary,
   RegisterAgentRequest
 } from '@m2oath/control-plane-client'
+
 import type {
   AuthenticationRequest
 } from '@m2oath/agent'
+
 import {
   M2OathSdk
 } from '@m2oath/sdk'
+
 import type {
-  AgentDirectoryWriter,
   AgentRegistrationGateway
 } from './agent-store.js'
+
 import {
   AgentRegistrationError
 } from './agent-registration-error.js'
 
 export interface M2OathAgentRegistrationGatewayOptions {
   sdk: M2OathSdk
-  directory: AgentDirectoryWriter
 }
 
 /**
@@ -28,7 +30,8 @@ export interface M2OathAgentRegistrationGatewayOptions {
  * Authentication is request-scoped. The gateway never owns or caches
  * caller credentials.
  *
- * This class never manufactures a canonical Agent ID.
+ * This class never manufactures a canonical Agent ID and never writes a
+ * second hosted copy of Agent identity state.
  */
 export class M2OathAgentRegistrationGateway
   implements AgentRegistrationGateway
@@ -71,18 +74,19 @@ export class M2OathAgentRegistrationGateway
       )
     }
 
-    const identity = result.enrollment.identity
+    const identity =
+      result.enrollment.identity
 
-    const agent: AgentSummary = {
+    return {
       agentId: identity.id,
       status: identity.status,
+
       ...(identity.displayName
-        ? { displayName: identity.displayName }
+        ? {
+            displayName:
+              identity.displayName
+          }
         : {})
     }
-
-    this.options.directory.saveAgent(agent)
-
-    return agent
   }
 }

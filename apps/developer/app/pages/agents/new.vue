@@ -7,94 +7,100 @@ useSeoMeta({
   title: 'Register Agent'
 })
 
+const {
+  loggedIn,
+  user,
+  clear: clearSession
+} = useUserSession()
+
 const displayName = ref('')
 
-const identifierType =
-  ref('runtime-jwt')
+const identifierType
+  = ref('runtime-jwt')
 
-const identifierValue =
-  ref('')
+const identifierValue
+  = ref('')
 
-const identifierIssuer =
-  ref('')
+const identifierIssuer
+  = ref('')
 
-const keyId =
-  ref('')
+const keyId
+  = ref('')
 
-const algorithm =
-  ref('')
+const algorithm
+  = ref('')
 
-const publicKey =
-  ref('')
+const publicKey
+  = ref('')
 
-const registering =
-  ref(false)
+const registering
+  = ref(false)
 
-const registration =
-  ref<RegisterAgentResponse | null>(null)
+const registration
+  = ref<RegisterAgentResponse | null>(null)
 
-const errorMessage =
-  ref<string | null>(null)
+const errorMessage
+  = ref<string | null>(null)
 
 async function registerAgent() {
   registering.value = true
   registration.value = null
   errorMessage.value = null
 
-  const trimmedIdentifierType =
-    identifierType.value.trim()
+  const trimmedIdentifierType
+    = identifierType.value.trim()
 
-  const trimmedIdentifierValue =
-    identifierValue.value.trim()
+  const trimmedIdentifierValue
+    = identifierValue.value.trim()
 
   if (
-    !trimmedIdentifierType ||
-    !trimmedIdentifierValue
+    !trimmedIdentifierType
+    || !trimmedIdentifierValue
   ) {
-    errorMessage.value =
-      'Identifier type and identifier value are required.'
+    errorMessage.value
+      = 'Identifier type and identifier value are required.'
 
     registering.value = false
     return
   }
 
-  const trimmedKeyId =
-    keyId.value.trim()
+  const trimmedKeyId
+    = keyId.value.trim()
 
-  const trimmedAlgorithm =
-    algorithm.value.trim()
+  const trimmedAlgorithm
+    = algorithm.value.trim()
 
-  const trimmedPublicKey =
-    publicKey.value.trim()
+  const trimmedPublicKey
+    = publicKey.value.trim()
 
-  const hasAnyCryptographicMaterial =
-    Boolean(
-      trimmedKeyId ||
-      trimmedAlgorithm ||
-      trimmedPublicKey
+  const hasAnyCryptographicMaterial
+    = Boolean(
+      trimmedKeyId
+      || trimmedAlgorithm
+      || trimmedPublicKey
     )
 
-  const hasCompleteCryptographicMaterial =
-    Boolean(
-      trimmedKeyId &&
-      trimmedAlgorithm &&
-      trimmedPublicKey
+  const hasCompleteCryptographicMaterial
+    = Boolean(
+      trimmedKeyId
+      && trimmedAlgorithm
+      && trimmedPublicKey
     )
 
   if (
-    hasAnyCryptographicMaterial &&
-    !hasCompleteCryptographicMaterial
+    hasAnyCryptographicMaterial
+    && !hasCompleteCryptographicMaterial
   ) {
-    errorMessage.value =
-      'If cryptographic material is provided, key ID, algorithm, and public key are all required.'
+    errorMessage.value
+      = 'If cryptographic material is provided, key ID, algorithm, and public key are all required.'
 
     registering.value = false
     return
   }
 
   try {
-    registration.value =
-      await $fetch<RegisterAgentResponse>(
+    registration.value
+      = await $fetch<RegisterAgentResponse>(
         '/api/agents/register',
         {
           method: 'POST',
@@ -132,8 +138,8 @@ async function registerAgent() {
         }
       )
   } catch {
-    errorMessage.value =
-      'The agent could not be registered through the M2Oath control plane.'
+    errorMessage.value
+      = 'The agent could not be registered through the M2Oath control plane.'
   } finally {
     registering.value = false
   }
@@ -152,6 +158,47 @@ async function registerAgent() {
         The canonical Agent ID is issued by M2Oath.
       </p>
 
+      <UAlert
+        v-if="loggedIn"
+        class="mt-6"
+        color="success"
+        title="Developer authenticated"
+        icon="i-lucide-shield-check"
+      >
+        <template #description>
+          <div class="space-y-2">
+            <p>
+              {{ user?.name || user?.email || user?.subject }}
+            </p>
+
+            <UButton
+              variant="ghost"
+              size="sm"
+              @click="clearSession"
+            >
+              Sign out
+            </UButton>
+          </div>
+        </template>
+      </UAlert>
+
+      <UAlert
+        v-else
+        class="mt-6"
+        color="warning"
+        title="Developer authentication required"
+        description="Sign in with Auth0 to establish your Developer session."
+        icon="i-lucide-log-in"
+      >
+        <template #actions>
+          <UButton
+            href="/auth/auth0"
+          >
+            Sign in with Auth0
+          </UButton>
+        </template>
+      </UAlert>
+
       <UCard class="mt-8">
         <form
           class="space-y-6"
@@ -165,7 +212,7 @@ async function registerAgent() {
               v-model="displayName"
               class="w-full"
               placeholder="Weather Agent"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
@@ -189,7 +236,7 @@ async function registerAgent() {
               v-model="identifierType"
               class="w-full"
               placeholder="runtime-jwt"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
@@ -202,7 +249,7 @@ async function registerAgent() {
               v-model="identifierValue"
               class="w-full"
               placeholder="weather-agent-runtime"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
@@ -214,7 +261,7 @@ async function registerAgent() {
               v-model="identifierIssuer"
               class="w-full"
               placeholder="https://issuer.example"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
@@ -236,7 +283,7 @@ async function registerAgent() {
               v-model="keyId"
               class="w-full"
               placeholder="weather-key-1"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
@@ -247,7 +294,7 @@ async function registerAgent() {
               v-model="algorithm"
               class="w-full"
               placeholder="RS256"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
@@ -260,14 +307,14 @@ async function registerAgent() {
               class="w-full"
               :rows="6"
               placeholder="-----BEGIN PUBLIC KEY-----"
-              :disabled="registering"
+              :disabled="registering || !loggedIn"
             />
           </UFormField>
 
           <UButton
             type="submit"
             :loading="registering"
-            :disabled="registering"
+            :disabled="registering || !loggedIn"
           >
             Register Agent
           </UButton>
@@ -331,6 +378,14 @@ async function registerAgent() {
             </dd>
           </div>
         </dl>
+
+        <template #footer>
+          <UButton
+            :to="`/agents/${encodeURIComponent(registration.agent.agentId)}`"
+          >
+            View Agent
+          </UButton>
+        </template>
       </UCard>
     </div>
   </UContainer>

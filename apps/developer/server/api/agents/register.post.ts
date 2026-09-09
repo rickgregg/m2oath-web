@@ -20,20 +20,30 @@ interface RegisterAgentBody {
 }
 
 export default defineEventHandler(async (event) => {
+  const session = await requireUserSession(event)
+
+  if (!session.user?.subject) {
+    throw createError({
+      statusCode: 401,
+      statusMessage:
+        'Developer authentication is required'
+    })
+  }
+
   const config = useRuntimeConfig(event)
   const body = await readBody<RegisterAgentBody>(event)
 
-  const displayName =
-    body.displayName?.trim()
+  const displayName
+    = body.displayName?.trim()
 
-  const identifierType =
-    body.identifier?.type?.trim()
+  const identifierType
+    = body.identifier?.type?.trim()
 
-  const identifierValue =
-    body.identifier?.value?.trim()
+  const identifierValue
+    = body.identifier?.value?.trim()
 
-  const identifierIssuer =
-    body.identifier?.issuer?.trim()
+  const identifierIssuer
+    = body.identifier?.issuer?.trim()
 
   if (!identifierType || !identifierValue) {
     throw createError({
@@ -43,24 +53,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const keyId =
-    body.cryptographicMaterial?.keyId?.trim()
+  const keyId
+    = body.cryptographicMaterial?.keyId?.trim()
 
-  const algorithm =
-    body.cryptographicMaterial?.algorithm?.trim()
+  const algorithm
+    = body.cryptographicMaterial?.algorithm?.trim()
 
-  const publicKey =
-    body.cryptographicMaterial?.publicKey?.trim()
+  const publicKey
+    = body.cryptographicMaterial?.publicKey?.trim()
 
-  const hasAnyCryptographicMaterial =
-    Boolean(keyId || algorithm || publicKey)
+  const hasAnyCryptographicMaterial
+    = Boolean(keyId || algorithm || publicKey)
 
-  const hasCompleteCryptographicMaterial =
-    Boolean(keyId && algorithm && publicKey)
+  const hasCompleteCryptographicMaterial
+    = Boolean(keyId && algorithm && publicKey)
 
   if (
-    hasAnyCryptographicMaterial &&
-    !hasCompleteCryptographicMaterial
+    hasAnyCryptographicMaterial
+    && !hasCompleteCryptographicMaterial
   ) {
     throw createError({
       statusCode: 400,
@@ -69,24 +79,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const developerToken =
-    config.developerToken?.trim()
+  const controlPlaneAccessToken
+    = session.secure?.controlPlaneAccessToken?.trim()
 
-  if (!developerToken) {
+  if (!controlPlaneAccessToken) {
     throw createError({
-      statusCode: 503,
+      statusCode: 401,
       statusMessage:
-        'Developer authentication is not configured'
+        'Developer control-plane credential is unavailable'
     })
   }
 
-  const client =
-    new HttpControlPlaneClient({
+  const client
+    = new HttpControlPlaneClient({
       baseUrl:
         config.controlPlaneBaseUrl,
 
       bearerToken:
-        developerToken
+        controlPlaneAccessToken
     })
 
   try {

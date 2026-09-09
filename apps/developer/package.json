@@ -13,10 +13,11 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.129",
     "@iconify-json/simple-icons": "^1.2.94",
+    "@m2oath/control-plane-client": "workspace:*",
     "@nuxt/ui": "^4.11.0",
     "nuxt": "^4.5.2",
-    "tailwindcss": "^4.3.3",
-    "@m2oath/control-plane-client": "workspace:*"
+    "nuxt-auth-utils": "^0.5.30",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",

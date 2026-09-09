@@ -2,7 +2,8 @@
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
-    '@nuxt/ui'
+    '@nuxt/ui',
+    'nuxt-auth-utils'
   ],
 
   devtools: {
@@ -13,6 +14,22 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     controlPlaneBaseUrl: 'http://127.0.0.1:4000',
+
+    /**
+     * OpenID Connect configuration for the authenticated Developer
+     * experience.
+     *
+     * These values remain server-only. OIDC establishes who the
+     * Developer is; M2Oath remains authoritative for lifecycle
+     * authorization such as agent.create.
+     */
+    oauth: {
+      auth0: {
+        clientId: '',
+        clientSecret: '',
+        domain: ''
+      }
+    },
 
     /**
      * Server-only Developer credential used when calling protected

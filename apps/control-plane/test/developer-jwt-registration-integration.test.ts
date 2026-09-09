@@ -7,7 +7,7 @@ import {
   JwtAuthenticationProvider
 } from '@m2oath/auth-jwt'
 import {
-  InMemoryAgentDirectory
+  M2OathAgentDirectory
 } from '../src/agent-store.js'
 import {
   M2OathAgentRegistrationGateway
@@ -74,13 +74,9 @@ describe('Developer JWT registration integration', () => {
         ]
       })
 
-    const directory =
-      new InMemoryAgentDirectory()
-
     const gateway =
       new M2OathAgentRegistrationGateway({
-        sdk: m2oath.sdk,
-        directory
+        sdk: m2oath.sdk
       })
 
     const agent =
@@ -148,13 +144,9 @@ describe('Developer JWT registration integration', () => {
         ]
       })
 
-    const directory =
-      new InMemoryAgentDirectory()
-
     const gateway =
       new M2OathAgentRegistrationGateway({
-        sdk: m2oath.sdk,
-        directory
+        sdk: m2oath.sdk
       })
 
     await expect(

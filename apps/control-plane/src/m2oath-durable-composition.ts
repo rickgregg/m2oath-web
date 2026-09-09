@@ -1,85 +1,83 @@
 import {
   AgentCryptographicBindingRotationService,
-  AgentEnrollmentService,
   AgentIdentityLifecycleService,
-  type AgentIdentityDirectory,
-  AgentRegistrationService,
   AuthorizedAgentCryptographicBindingRotationService,
   AuthorizedAgentDisableService,
   AuthorizedAgentEnrollmentService,
   ConfiguredAgentLifecycleAuthorizationPolicy,
+  type AgentIdentityDirectory,
   type AuthenticationProvider
 } from '@m2oath/agent'
 
 import {
-  InMemoryAgentCryptographicBindingStore,
-  InMemoryAgentIdentityBindingStore,
-  InMemoryAgentIdentityStore,
-  InMemoryAgentRegistrationProvenanceStore,
   UuidAgentIdGenerator
 } from '@m2oath/persistence'
+
+import {
+  MysqlAgentCryptographicBindingStore,
+  MysqlAgentEnrollmentUnitOfWork,
+  MysqlAgentIdentityStore,
+  MysqlAgentLifecycleAuditRecorder,
+  MysqlAuthorizedAgentEnrollmentOperation,
+  type Pool
+} from '@m2oath/persistence-mysql'
 
 import {
   M2OathSdk
 } from '@m2oath/sdk'
 
-export interface M2OathHostedDeveloperPrincipal {
+export interface DurableM2OathHostedDeveloperPrincipal {
   type: string
   subject: string
   issuer?: string
 }
 
-export interface CreateM2OathHostedCompositionOptions {
-  /**
-   * Authentication authority for hosted lifecycle operations.
-   *
-   * Production will supply @m2oath/auth-jwt here.
-   */
+export interface CreateDurableM2OathHostedCompositionOptions {
   authenticationProvider: AuthenticationProvider
 
-  /**
-   * Exact authenticated Developer principals authorized by M2Oath.
-   *
-   * JWT scopes are intentionally not used as lifecycle authority.
-   */
-  developerPrincipals: M2OathHostedDeveloperPrincipal[]
+  developerPrincipals:
+    DurableM2OathHostedDeveloperPrincipal[]
+
+  pool: Pool
 }
 
-export interface M2OathHostedComposition {
+export interface DurableM2OathHostedComposition {
   sdk: M2OathSdk
+
+  /**
+   * Durable canonical Agent identity read boundary.
+   *
+   * Consumers read Agent state through the domain contract rather than
+   * querying MySQL directly.
+   */
   identityDirectory: AgentIdentityDirectory
 }
 
-export function createM2OathHostedComposition(
-  options: CreateM2OathHostedCompositionOptions
-): M2OathHostedComposition {
+/**
+ * Production hosted composition backed by durable MySQL persistence.
+ *
+ * MySQL owns durable facts and transaction mechanics only.
+ *
+ * Authentication, lifecycle authorization, canonical identity creation,
+ * lifecycle decisions, and protected execution authority remain in
+ * M2Oath services.
+ */
+export function createDurableM2OathHostedComposition(
+  options: CreateDurableM2OathHostedCompositionOptions
+): DurableM2OathHostedComposition {
   const identityStore =
-    new InMemoryAgentIdentityStore()
-
-  const identityBindingStore =
-    new InMemoryAgentIdentityBindingStore()
-
-  const cryptographicBindingStore =
-    new InMemoryAgentCryptographicBindingStore()
-
-  const provenanceStore =
-    new InMemoryAgentRegistrationProvenanceStore()
-
-  const idGenerator =
-    new UuidAgentIdGenerator()
-
-  const registrationService =
-    new AgentRegistrationService(
-      idGenerator,
-      identityStore
+    new MysqlAgentIdentityStore(
+      options.pool
     )
 
-  const enrollmentService =
-    new AgentEnrollmentService(
-      registrationService,
-      identityBindingStore,
-      () => new Date(),
-      cryptographicBindingStore
+  const cryptographicBindingStore =
+    new MysqlAgentCryptographicBindingStore(
+      options.pool
+    )
+
+  const lifecycleAuditRecorder =
+    new MysqlAgentLifecycleAuditRecorder(
+      options.pool
     )
 
   const lifecycleAuthorizationPolicy =
@@ -90,6 +88,7 @@ export function createM2OathHostedComposition(
             principal: {
               ...principal
             },
+
             actions: [
               'agent.create',
               'agent.rotate-key',
@@ -99,14 +98,26 @@ export function createM2OathHostedComposition(
         )
     })
 
+  const idGenerator =
+    new UuidAgentIdGenerator()
+
+  const enrollmentUnitOfWork =
+    new MysqlAgentEnrollmentUnitOfWork(
+      options.pool
+    )
+
+  const enrollmentOperation =
+    new MysqlAuthorizedAgentEnrollmentOperation(
+      enrollmentUnitOfWork,
+      idGenerator
+    )
+
   const authorizedEnrollmentService =
-    new AuthorizedAgentEnrollmentService(
+    AuthorizedAgentEnrollmentService.fromOperation(
       options.authenticationProvider,
       lifecycleAuthorizationPolicy,
-      enrollmentService,
-      undefined,
-      () => new Date(),
-      provenanceStore
+      enrollmentOperation,
+      lifecycleAuditRecorder
     )
 
   const rotationService =
@@ -118,7 +129,8 @@ export function createM2OathHostedComposition(
     new AuthorizedAgentCryptographicBindingRotationService(
       options.authenticationProvider,
       lifecycleAuthorizationPolicy,
-      rotationService
+      rotationService,
+      lifecycleAuditRecorder
     )
 
   const lifecycleService =
@@ -130,7 +142,8 @@ export function createM2OathHostedComposition(
     new AuthorizedAgentDisableService(
       options.authenticationProvider,
       lifecycleAuthorizationPolicy,
-      lifecycleService
+      lifecycleService,
+      lifecycleAuditRecorder
     )
 
   const sdk =
