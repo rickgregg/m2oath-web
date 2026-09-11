@@ -63,6 +63,39 @@ export class DeveloperAccountGateway {
   }
 
   /**
+   * Links a freshly authenticated external identity to the currently
+   * authenticated canonical Developer account.
+   *
+   * Both identities are authenticated independently. Raw issuer and
+   * subject values are never accepted from the caller.
+   */
+  async linkExternalIdentity(
+    authentication: AuthenticationRequest,
+    externalIdentityAuthentication: AuthenticationRequest
+  ): Promise<DeveloperAccount> {
+    const developer =
+      await this.resolveAuthenticated(
+        authentication
+      )
+
+    const externalIdentity =
+      await this.authenticateIdentity(
+        externalIdentityAuthentication
+      )
+
+    return this.accountService.linkExternalIdentity(
+      developer.developerId,
+      {
+        issuer:
+          externalIdentity.issuer,
+
+        subject:
+          externalIdentity.subject
+      }
+    )
+  }
+
+  /**
    * Protected REST API boundary.
    *
    * Ordinary API access must resolve an existing Developer account and

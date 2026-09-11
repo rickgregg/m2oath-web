@@ -3,7 +3,7 @@
 **Document Type:** Product, Information Architecture, and Developer
 Experience Requirements\
 **Status:** Draft V0.4 — Authoritative Website Source of Truth\
-**Date:** 2026-09-09\
+**Date:** 2026-09-11\
 **Primary Product:** M2Oath Machine Authority Platform — public AI Trust Container + proprietary Trust Service + Trusted Domains\
 **Related Ecosystem:** SaaSKamp\
 **Proposed Web Stack:** Nuxt + VitePress
@@ -1350,17 +1350,75 @@ The permanent product boundary is:
 
 ## 23.1 Developer Authentication
 
-The Developer application should support:
+The Developer application uses Auth0 / OIDC for interactive human
+authentication and a Nuxt server-side session for the M2Oath Developer Portal.
+The authenticated flow is:
 
--   OIDC sign-in;
--   canonical developer identity;
--   short-lived credentials;
--   explicit capability/authorization mapping;
--   expiration visibility;
--   refresh/re-authentication;
--   fail-closed authorization.
+``` text
+Developer Browser
+    │
+    ▼
+Auth0 Universal Login / OIDC
+    │
+    ▼
+Nuxt Developer Session
+    │
+    │ request-scoped short-lived Developer access credential
+    ▼
+Developer Nuxt Server
+    │
+    ▼
+M2Oath Trust / Control-Plane API
+    │
+    ▼
+Canonical M2Oath Developer Account
+```
 
-OIDC/JWT claims must not automatically become M2Oath execution authority.
+The Developer application must support:
+
+-   OIDC sign-in and signup;
+-   canonical M2Oath Developer Account resolution;
+-   short-lived request-scoped credentials;
+-   secure server-side session handling;
+-   expiration and re-authentication behavior;
+-   explicit M2Oath role/capability/authorization mapping;
+-   sign-out that clears the M2Oath application session;
+-   fail-closed authorization; and
+-   secure linking of additional authenticated external identities.
+
+The canonical Developer Account is M2Oath-owned application identity. Auth0
+issuer/subject pairs are external identity bindings to that account; email is
+profile data and must not be used as the canonical Developer key.
+
+A Developer may link multiple external identities to one canonical Developer
+Account only through an authenticated linking flow that independently proves
+both the existing Developer session and the new external identity. An external
+identity already bound to another Developer Account must fail closed and must
+not be silently moved or merged.
+
+The identity-linking flow must preserve this boundary:
+
+``` text
+Existing Developer Session
+        │
+        │ proves canonical Developer A
+        ▼
+Fresh Auth0 Login (prompt=login)
+        │
+        │ proves external identity B
+        ▼
+M2Oath Trust / Control Plane authenticates both
+        │
+        ▼
+Bind identity B -> Developer A
+```
+
+The `/auth/link` entry point must require an existing Developer session before
+starting the second Auth0 flow. A signed-out request must not initiate identity
+linking.
+
+OIDC/JWT claims must not automatically become M2Oath authority. Developer roles,
+status, ownership, and lifecycle authorization are M2Oath-owned state.
 
 Developer JWT and Agent Runtime JWT remain separate:
 
@@ -1371,6 +1429,57 @@ Developer JWT
 Agent Runtime JWT
     authenticates agent runtime
 ```
+
+The Developer credential must never become the Agent Runtime credential, Agent
+trust evidence, or an enrollment payload field.
+
+### Shared M2Oath Human Authentication Experience
+
+The Auth0 Universal Login experience should use reusable M2Oath branding so the
+same authentication system can later support other human M2Oath account types,
+such as customer, organization, billing, or administrative users.
+
+Those future human applications may use server-side authenticated sessions and
+do not inherently require an M2Oath API JWT to be exposed to browser code.
+Authentication, canonical M2Oath account identity, application authorization,
+and Agent identity remain separate concerns.
+
+The initial shared visual baseline uses the current M2Oath/Nuxt presentation:
+M2Oath logo, Public Sans, slate neutrals, M2Oath green, and a centered
+card/dialog-style Auth0 Universal Login experience. These visual tokens are
+provisional and may evolve with the broader M2Oath design system.
+
+### OAuth Light/Dark Theme Synchronization — Deferred Enhancement
+
+The Developer Portal supports Nuxt UI light and dark color modes. Auth0 Universal
+Login is a separately hosted document and does not automatically inherit the
+Nuxt color-mode state.
+
+A future enhancement should propagate the selected M2Oath presentation theme
+across the OAuth authorization boundary:
+
+``` text
+Nuxt UI Color Mode
+        │
+        │ light / dark presentation context
+        ▼
+M2Oath OAuth Route
+        │
+        ▼
+Auth0 Universal Login Customization
+        │
+        ├── light -> light background + m2oath-logo-light.png
+        └── dark  -> dark background  + m2oath-logo-dark.png
+```
+
+The implementation may use Auth0-supported Universal Login page templates,
+conditional customization, or equivalent presentation mechanisms. Theme
+propagation is presentation-only state: it must not influence authentication,
+canonical Developer identity resolution, authorization, Agent ownership, token
+issuance, session security, or Trust Container policy.
+
+Until this enhancement is implemented, the Auth0 login/signup experience may
+remain light-themed regardless of the Developer Portal's selected color mode.
 
 ------------------------------------------------------------------------
 
@@ -1562,6 +1671,18 @@ researchers, and prospective customers.
 
 # 26. Design and Branding Requirements
 
+A baseline M2Oath brand treatment is now established for the Developer Portal
+and Auth0 Universal Login. The current implementation uses transparent
+light-theme and dark-theme M2Oath logo variants in the Nuxt header and a branded
+Auth0 Universal Login experience. Broader design-system work remains deferred.
+
+The Developer header may switch between:
+
+``` text
+m2oath-logo-light.png   dark lettering for light backgrounds
+m2oath-logo-dark.png    light lettering for dark backgrounds
+```
+
 The public site, Developer application, Agent application, and docs should share:
 
 -   M2Oath logo;
@@ -1584,6 +1705,13 @@ example, M2Oath Weather) rather than unrelated product identities.
 A useful shorthand is:
 
 > **The evidence is vertical. The method of trust is horizontal.**
+
+Auth0 remains responsible for authentication credentials and authentication
+UI behavior. M2Oath branding may control presentation, but M2Oath must never
+prefill, store, inject, or transmit Developer passwords. Email prefill through
+OIDC `login_hint` may be considered only where it improves the flow without
+confusing identity linking; the current Developer implementation intentionally
+does not require it.
 
 The visual identity should reinforce:
 
@@ -1852,14 +1980,15 @@ server-issued canonical Agent ID.
 
 The hosted implementation has advanced beyond the original Day 3 scaffold.
 Developer OIDC/session handling, canonical Developer Account state,
-Developer-to-Agent ownership, durable Agent registration, and ownership-scoped
-Agent list/detail flows have been interactively proven.
+Developer-to-Agent ownership, durable Agent registration, ownership-scoped
+Agent list/detail flows, registration recovery/idempotency, Developer-account
+lifecycle authorization, external identity linking, session-required linking,
+and malformed-link request rejection have been implemented and tested.
 
 The current `@m2oath/control-plane` process is a prototype of future
-`m2oath-trust`. Remaining hardening includes automated acceptance coverage,
-registration recovery/idempotency, removal of temporary configured-subject
-authorization seams, authentication/signup UX polish, and the planned
-public/private package separation.
+`m2oath-trust`. Remaining Phase 8 work is the final full-workspace checkpoint and
+any cleanup discovered by that validation. Public/private package separation is
+the following architecture phase rather than unfinished Developer-auth work.
 
 ## Phase 4 --- Interactive Demonstration
 

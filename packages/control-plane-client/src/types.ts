@@ -48,3 +48,12 @@ export interface BootstrapDeveloperSessionRequest {
 export interface BootstrapDeveloperSessionResponse {
   developer: DeveloperAccountSummary
 }
+
+
+export interface LinkDeveloperExternalIdentityRequest {
+  credential: string
+}
+
+export interface LinkDeveloperExternalIdentityResponse {
+  developer: DeveloperAccountSummary
+}

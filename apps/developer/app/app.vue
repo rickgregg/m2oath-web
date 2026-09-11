@@ -16,13 +16,27 @@ useSeoMeta({
 
 <template>
   <UApp>
-    <UHeader>
+    <UHeader class="[--ui-header-height:6rem]">
       <template #left>
         <NuxtLink
           to="/"
-          class="font-semibold"
+          class="flex items-center gap-3 font-semibold"
         >
-          M2Oath Developer
+          <img
+            src="/brand/m2oath-logo-light.png"
+            alt="M2Oath"
+            class="h-24 w-auto dark:hidden"
+          >
+
+          <img
+            src="/brand/m2oath-logo-dark.png"
+            alt="M2Oath"
+            class="hidden h-24 w-auto dark:block"
+          >
+
+          <span>
+            M2Oath Developer
+          </span>
         </NuxtLink>
       </template>
 

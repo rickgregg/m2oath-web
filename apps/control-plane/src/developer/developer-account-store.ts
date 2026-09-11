@@ -17,4 +17,8 @@ export interface DeveloperAccountStore {
     account: DeveloperAccount,
     binding: DeveloperIdentityBinding
   ): Promise<void>
+
+  addExternalIdentityBinding(
+    binding: DeveloperIdentityBinding
+  ): Promise<void>
 }

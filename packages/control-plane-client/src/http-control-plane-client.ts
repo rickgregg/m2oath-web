@@ -3,6 +3,8 @@ import type {
   AgentSummary,
   BootstrapDeveloperSessionRequest,
   BootstrapDeveloperSessionResponse,
+  LinkDeveloperExternalIdentityRequest,
+  LinkDeveloperExternalIdentityResponse,
   RegisterAgentRequest,
   RegisterAgentResponse
 } from './types.js'
@@ -44,6 +46,21 @@ export class HttpControlPlaneClient implements ControlPlaneClient {
   ): Promise<BootstrapDeveloperSessionResponse> {
     return this.request<BootstrapDeveloperSessionResponse>(
       '/v1/developers/session',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      }
+    )
+  }
+
+  async linkDeveloperExternalIdentity(
+    request: LinkDeveloperExternalIdentityRequest
+  ): Promise<LinkDeveloperExternalIdentityResponse> {
+    return this.request<LinkDeveloperExternalIdentityResponse>(
+      '/v1/developers/me/identity-bindings',
       {
         method: 'POST',
         headers: {

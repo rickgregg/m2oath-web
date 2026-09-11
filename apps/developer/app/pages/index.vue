@@ -89,7 +89,7 @@ useSeoMeta({
             </UButton>
           </a>
 
-          <a href="/auth/auth0">
+          <a href="/auth/signup">
             <UButton variant="outline">
               Create Developer Account
             </UButton>

@@ -78,6 +78,90 @@ export class DeveloperAccountService {
     )
   }
 
+  async linkExternalIdentity(
+    developerId: string,
+    identity: {
+      issuer: string
+      subject: string
+    }
+  ): Promise<DeveloperAccount> {
+    const normalizedDeveloperId =
+      developerId.trim()
+
+    const issuer =
+      identity.issuer.trim()
+
+    const subject =
+      identity.subject.trim()
+
+    if (!normalizedDeveloperId) {
+      throw new Error(
+        'developer-account-id-required'
+      )
+    }
+
+    if (!issuer) {
+      throw new Error(
+        'developer-identity-issuer-required'
+      )
+    }
+
+    if (!subject) {
+      throw new Error(
+        'developer-identity-subject-required'
+      )
+    }
+
+    const account =
+      await this.store.findById(
+        normalizedDeveloperId
+      )
+
+    if (account === undefined) {
+      throw new Error(
+        'developer-account-not-found'
+      )
+    }
+
+    if (account.status !== 'active') {
+      throw new Error(
+        'developer-account-disabled'
+      )
+    }
+
+    const existing =
+      await this.store.findByExternalIdentity(
+        issuer,
+        subject
+      )
+
+    if (existing !== undefined) {
+      if (
+        existing.developerId ===
+        account.developerId
+      ) {
+        return account
+      }
+
+      throw new Error(
+        'developer-external-identity-already-bound'
+      )
+    }
+
+    await this.store.addExternalIdentityBinding({
+      developerId:
+        account.developerId,
+
+      issuer,
+      subject,
+
+      createdAt:
+        this.now()
+    })
+
+    return account
+  }
+
   async resolveOrCreate(
     request: ResolveDeveloperAccountRequest
   ): Promise<DeveloperAccount> {

@@ -4,8 +4,8 @@ import {
   AuthorizedAgentCryptographicBindingRotationService,
   AuthorizedAgentDisableService,
   AuthorizedAgentEnrollmentService,
-  ConfiguredAgentLifecycleAuthorizationPolicy,
   type AgentIdentityDirectory,
+  type AgentLifecycleAuthorizationPolicy,
   type AuthenticationProvider
 } from '@m2oath/agent'
 
@@ -26,17 +26,11 @@ import {
   M2OathSdk
 } from '@m2oath/sdk'
 
-export interface DurableM2OathHostedDeveloperPrincipal {
-  type: string
-  subject: string
-  issuer?: string
-}
-
 export interface CreateDurableM2OathHostedCompositionOptions {
   authenticationProvider: AuthenticationProvider
 
-  developerPrincipals:
-    DurableM2OathHostedDeveloperPrincipal[]
+  lifecycleAuthorizationPolicy:
+    AgentLifecycleAuthorizationPolicy
 
   pool: Pool
 }
@@ -81,22 +75,7 @@ export function createDurableM2OathHostedComposition(
     )
 
   const lifecycleAuthorizationPolicy =
-    new ConfiguredAgentLifecycleAuthorizationPolicy({
-      grants:
-        options.developerPrincipals.map(
-          principal => ({
-            principal: {
-              ...principal
-            },
-
-            actions: [
-              'agent.create',
-              'agent.rotate-key',
-              'agent.disable'
-            ]
-          })
-        )
-    })
+    options.lifecycleAuthorizationPolicy
 
   const idGenerator =
     new UuidAgentIdGenerator()

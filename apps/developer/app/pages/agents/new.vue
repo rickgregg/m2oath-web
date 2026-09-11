@@ -3,12 +3,15 @@ import type {
   RegisterAgentResponse
 } from '@m2oath/control-plane-client'
 
+definePageMeta({
+  middleware: 'auth'
+})
+
 useSeoMeta({
   title: 'Register Agent'
 })
 
 const {
-  loggedIn,
   user,
   clear: clearSession
 } = useUserSession()
@@ -159,7 +162,6 @@ async function registerAgent() {
       </p>
 
       <UAlert
-        v-if="loggedIn"
         class="mt-6"
         color="success"
         title="Developer authenticated"
@@ -182,23 +184,6 @@ async function registerAgent() {
         </template>
       </UAlert>
 
-      <UAlert
-        v-else
-        class="mt-6"
-        color="warning"
-        title="Developer authentication required"
-        description="Sign in with Auth0 to establish your Developer session."
-        icon="i-lucide-log-in"
-      >
-        <template #actions>
-          <UButton
-            href="/auth/auth0"
-          >
-            Sign in with Auth0
-          </UButton>
-        </template>
-      </UAlert>
-
       <UCard class="mt-8">
         <form
           class="space-y-6"
@@ -212,7 +197,7 @@ async function registerAgent() {
               v-model="displayName"
               class="w-full"
               placeholder="Weather Agent"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
@@ -236,7 +221,7 @@ async function registerAgent() {
               v-model="identifierType"
               class="w-full"
               placeholder="runtime-jwt"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
@@ -249,7 +234,7 @@ async function registerAgent() {
               v-model="identifierValue"
               class="w-full"
               placeholder="weather-agent-runtime"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
@@ -261,7 +246,7 @@ async function registerAgent() {
               v-model="identifierIssuer"
               class="w-full"
               placeholder="https://issuer.example"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
@@ -283,7 +268,7 @@ async function registerAgent() {
               v-model="keyId"
               class="w-full"
               placeholder="weather-key-1"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
@@ -294,7 +279,7 @@ async function registerAgent() {
               v-model="algorithm"
               class="w-full"
               placeholder="RS256"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
@@ -307,14 +292,14 @@ async function registerAgent() {
               class="w-full"
               :rows="6"
               placeholder="-----BEGIN PUBLIC KEY-----"
-              :disabled="registering || !loggedIn"
+              :disabled="registering"
             />
           </UFormField>
 
           <UButton
             type="submit"
             :loading="registering"
-            :disabled="registering || !loggedIn"
+            :disabled="registering"
           >
             Register Agent
           </UButton>

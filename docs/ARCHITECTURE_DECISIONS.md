@@ -2,7 +2,7 @@
 
 **Document Type:** Architecture Decision Record  
 **Status:** Active  
-**Date:** 2026-09-09  
+**Date:** 2026-09-11  
 **Repository:** `m2oath-web`  
 **Related Documents:** `docs/ARCHITECTURE.md`, `docs/WEBSITE_REQUIREMENTS.md`
 
@@ -726,7 +726,7 @@ For protected registration:
 
 The Developer credential remains HTTP/security context only. It does not become canonical Agent identity, Agent Runtime credential, Agent trust evidence, or automatic capability authority.
 
-The currently configured Developer Nuxt token is a private server-side seam. A future OIDC/login/session implementation can replace how that request-scoped credential is obtained without changing the control-plane security boundary.
+The configured Developer Nuxt token seam has been replaced by interactive Auth0/OIDC login plus a Nuxt server-side Developer session. The authenticated Developer's short-lived control-plane credential remains request-scoped server-side transport/security context, preserving the same control-plane boundary.
 
 ---
 
@@ -774,8 +774,9 @@ The implementation is checkpointed at:
 75b9e58  Update 09-08-2026 2:16pm
 ```
 
-The hosted control plane still contains a process-local Agent directory
-projection for current list/detail experiences.
+The hosted control plane previously contained a process-local Agent directory
+projection for list/detail experiences; Phase 7 replaced that projection with the
+durable `AgentIdentityDirectory`/MySQL-backed path.
 
 ## Decision
 
@@ -807,8 +808,8 @@ open-source framework owns reusable contracts and persistence adapters.
 - the database stores durable facts and transaction state rather than policy;
 - the hosted control plane does not duplicate identity/lifecycle persistence
   logic already implemented in the reusable framework;
-- `m2oath-web` Phase 7 remains incomplete until the process-local hosted
-  directory is replaced as the durable Agent-state source; and
+- Phase 7 is complete: the process-local hosted directory has been replaced by
+  the durable `AgentIdentityDirectory`/MySQL-backed Agent-state path; and
 - the Trust Container / `ProtectedOperationExecutor` remains the final
   protected-execution enforcement boundary.
 
@@ -1019,4 +1020,81 @@ The architecture must continue to answer **yes** to all of the following:
 5. Can the public and proprietary packages eventually be moved into separate repositories without redesigning their contracts?
 
 The answer to all five must remain **yes**.
+---
+
+# ADR-025 — Canonical Developer Accounts, External Identity Linking, and Shared Authentication Presentation
+
+**Status:** Accepted and Implemented for the Developer Portal
+
+## Context
+
+Phase 8 replaced the configured Developer-token seam with interactive Auth0/OIDC login and a Nuxt server-side session. During acceptance testing, distinct Auth0 identities using the same email resolved to distinct external issuer/subject identities, demonstrating that email cannot safely serve as the canonical M2Oath Developer key.
+
+M2Oath also needs a secure way for one canonical Developer to use multiple authentication methods without allowing one Developer to steal or silently merge another Developer's external identity. At the same time, the M2Oath-branded Auth0 Universal Login experience should be reusable for future human account types without collapsing authentication, canonical account identity, authorization, or Agent identity into one concern.
+
+## Decision
+
+A canonical Developer Account is M2Oath-owned application identity. Auth0/OIDC identities are external bindings identified by issuer + subject. Email is profile data only and is not the canonical Developer key.
+
+The implemented authentication path is:
+
+```text
+Developer Browser
+    ↓
+Auth0 Universal Login / OIDC
+    ↓
+Nuxt Developer Session
+    ↓ request-scoped Developer access credential
+Developer Nuxt Server
+    ↓
+M2Oath Control Plane / future m2oath-trust
+    ↓
+Canonical Developer Account
+```
+
+External identity linking requires two independently authenticated contexts:
+
+```text
+Existing Developer session A
+        +
+Fresh Auth0 identity B (prompt=login)
+        ↓
+Control plane authenticates both
+        ↓
+Bind identity B -> canonical Developer A
+```
+
+The following rules are mandatory:
+
+- `/auth/link` requires an existing Developer session before Auth0 linking begins;
+- the original Developer session credential authorizes which canonical Developer is being modified;
+- the newly returned Auth0 credential proves the external identity being added;
+- an external identity already bound to another Developer must return a conflict and must not be reassigned;
+- missing or blank secondary credentials fail closed;
+- linking does not replace or mutate Agent identity; and
+- Developer roles, status, ownership, and M2Oath authorization remain server-owned state.
+
+## Shared Authentication Presentation
+
+Auth0 Universal Login may be branded to visually match M2Oath while Auth0 remains responsible for authentication credentials and authentication. M2Oath must not prefill, store, inject, or transmit Developer passwords.
+
+The Developer Portal may maintain separate transparent logo assets for light and dark presentation. A future Auth0 customization may receive presentation-only light/dark context from the Nuxt OAuth entry route so Universal Login visually follows the user's selected theme. That theme value must never influence authentication, identity resolution, authorization, token issuance, ownership, or Trust Container policy.
+
+The same branded authentication experience may later be reused by customer, organization, billing, or administrative human accounts. Those applications may use server-side authenticated sessions and do not inherently require an M2Oath API JWT to be exposed to the browser.
+
+## Consequences
+
+- one canonical Developer can use multiple external sign-in identities;
+- one external issuer/subject identity belongs to at most one canonical Developer;
+- email collisions do not merge Developer Accounts;
+- Auth0 remains the authentication provider while M2Oath remains authoritative for canonical Developer identity and application authorization;
+- Developer credentials remain distinct from Agent Runtime credentials;
+- login/signup/linking presentation can evolve without changing the M2Oath security model; and
+- future human M2Oath account experiences can reuse the same authentication presentation while retaining separate account and authorization semantics.
+
+## Governing Test
+
+> **Can authentication presentation or an external identity change without changing which M2Oath canonical Developer Account is authoritative or weakening the separation between authentication and authorization?**
+
+The answer must remain **yes**.
 

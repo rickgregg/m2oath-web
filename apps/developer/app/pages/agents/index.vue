@@ -3,13 +3,13 @@ import type {
   AgentSummary
 } from '@m2oath/control-plane-client'
 
+definePageMeta({
+  middleware: 'auth'
+})
+
 useSeoMeta({
   title: 'My Agents'
 })
-
-const {
-  loggedIn
-} = useUserSession()
 
 const {
   data: agents,
@@ -48,17 +48,8 @@ const {
         </UButton>
       </div>
 
-      <UAlert
-        v-if="!loggedIn"
-        class="mt-8"
-        color="warning"
-        title="Developer authentication required"
-        description="Sign in before viewing your Agents."
-        icon="i-lucide-log-in"
-      />
-
       <UCard
-        v-else-if="status === 'pending'"
+        v-if="status === 'pending'"
         class="mt-8"
       >
         Loading your Agents…

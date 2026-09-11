@@ -16,6 +16,24 @@ export interface AgentRegistrationGateway {
   ): Promise<AgentSummary>
 }
 
+/**
+ * Hosted recovery boundary for Developer-initiated Agent registration.
+ *
+ * Implementations may recover an already-existing canonical Agent only
+ * when authoritative M2Oath identity and registration provenance prove
+ * that recovery is safe for the authenticated caller.
+ *
+ * This contract does not create Agent identities and does not grant
+ * ownership. Ownership remains the responsibility of the hosted
+ * Developer-Agent relationship service.
+ */
+export interface AgentRegistrationRecoveryGateway {
+  findRecoverableAgent(
+    request: RegisterAgentRequest,
+    authentication: AuthenticationRequest
+  ): Promise<AgentSummary | undefined>
+}
+
 export interface AgentDirectory {
   getAgent(
     agentId: string

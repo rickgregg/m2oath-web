@@ -176,6 +176,28 @@ export class MysqlDeveloperAccountStore
     }
   }
 
+  async addExternalIdentityBinding(
+    binding: DeveloperIdentityBinding
+  ): Promise<void> {
+    await this.pool.execute(
+      `
+        INSERT INTO developer_identity_bindings (
+          developer_id,
+          issuer,
+          subject,
+          created_at
+        )
+        VALUES (?, ?, ?, ?)
+      `,
+      [
+        binding.developerId,
+        binding.issuer,
+        binding.subject,
+        binding.createdAt
+      ]
+    )
+  }
+
   private mapRow(
     row: DeveloperAccountRow
   ): DeveloperAccount {

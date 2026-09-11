@@ -141,6 +141,101 @@ async function handleRequest(
   }
 
   if (
+    method === 'POST' &&
+    url.pathname ===
+      '/v1/developers/me/identity-bindings'
+  ) {
+    if (!options.developerAccountGateway) {
+      sendJson(response, 503, {
+        error:
+          'developer-account-service-unavailable'
+      })
+      return
+    }
+
+    const authentication =
+      getBearerAuthenticationRequest(request)
+
+    if (!authentication) {
+      sendJson(response, 401, {
+        error:
+          'developer-authentication-required'
+      })
+      return
+    }
+
+    const body =
+      await readJsonBody<{
+        credential?: string
+      }>(request)
+
+    const externalCredential =
+      body.credential?.trim()
+
+    if (!externalCredential) {
+      sendJson(response, 400, {
+        error:
+          'developer-external-identity-credential-required'
+      })
+      return
+    }
+
+    try {
+      const developer =
+        await options.developerAccountGateway.linkExternalIdentity(
+          authentication,
+          {
+            credential:
+              externalCredential
+          }
+        )
+
+      sendJson(response, 200, {
+        developer: {
+          developerId:
+            developer.developerId,
+          displayName:
+            developer.displayName,
+          status:
+            developer.status,
+          role:
+            developer.role
+        }
+      })
+    } catch (error) {
+      if (
+        error instanceof DeveloperSessionError &&
+        (
+          error.stage === 'authentication' ||
+          error.stage === 'identity'
+        )
+      ) {
+        sendJson(response, 401, {
+          error:
+            error.message
+        })
+        return
+      }
+
+      if (
+        error instanceof Error &&
+        error.message ===
+          'developer-external-identity-already-bound'
+      ) {
+        sendJson(response, 409, {
+          error:
+            error.message
+        })
+        return
+      }
+
+      throw error
+    }
+
+    return
+  }
+
+  if (
     method === 'GET' &&
     url.pathname === '/v1/developers/me/agents'
   ) {

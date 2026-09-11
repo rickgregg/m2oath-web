@@ -223,4 +223,81 @@ describe('HttpControlPlaneClient', () => {
       ControlPlaneHttpError
     )
   })
+
+  it('links a freshly authenticated external identity to the current Developer account', async () => {
+    const fetch = vi.fn(async () => new Response(
+      JSON.stringify({
+        developer: {
+          developerId: 'dev_123',
+          displayName: 'Developer',
+          status: 'active',
+          role: 'developer'
+        }
+      }),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    ))
+
+    const client = new HttpControlPlaneClient({
+      baseUrl: 'https://control.m2oath.example/',
+      bearerToken: 'current-developer-token',
+      fetch
+    })
+
+    const result =
+      await client.linkDeveloperExternalIdentity({
+        credential: 'fresh-external-identity-token'
+      })
+
+    expect(result).toEqual({
+      developer: {
+        developerId: 'dev_123',
+        displayName: 'Developer',
+        status: 'active',
+        role: 'developer'
+      }
+    })
+
+    expect(fetch).toHaveBeenCalledOnce()
+
+    const [url, init] =
+      fetch.mock.calls[0]!
+
+    expect(url).toBe(
+      'https://control.m2oath.example/v1/developers/me/identity-bindings'
+    )
+
+    expect(init?.method).toBe('POST')
+
+    const headers =
+      new Headers(init?.headers)
+
+    expect(
+      headers.get('authorization')
+    ).toBe(
+      'Bearer current-developer-token'
+    )
+
+    expect(
+      headers.get('content-type')
+    ).toBe('application/json')
+
+    expect(
+      JSON.parse(String(init?.body))
+    ).toEqual({
+      credential:
+        'fresh-external-identity-token'
+    })
+
+    expect(
+      String(init?.body)
+    ).not.toContain(
+      'current-developer-token'
+    )
+  })
+
 })

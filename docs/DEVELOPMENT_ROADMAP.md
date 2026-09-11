@@ -2,9 +2,9 @@
 
 **Document Type:** Engineering Development Roadmap  
 **Status:** Active  
-**Date:** 2026-09-09  
+**Date:** 2026-09-11  
 **Repository:** `m2oath-web`  
-**Current Checkpoint:** Phase 8 IN PROGRESS — Developer OIDC/session, canonical Developer Account, Developer→Agent ownership, and ownership-scoped Agent UX proven; architecture now separates the public Trust Container runtime from proprietary M2Oath Trust and Trusted Domain services  
+**Current Checkpoint:** Phase 8 FINAL CHECKPOINT — Developer OIDC/session, canonical Developer Account, ownership, recovery, lifecycle authorization, secure external-identity linking, route/session hardening, and branded authentication UX are implemented; final full-workspace validation remains before Phase 8 is marked complete  
 **Related Documents:** `docs/WEBSITE_REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/ARCHITECTURE_DECISIONS.md`
 
 ---
@@ -486,7 +486,7 @@ canonical agt_<UUID>
 
 ## Developer Application Integration
 
-The Developer Nuxt server holds the current configured Developer token in private runtime configuration and attaches it through `HttpControlPlaneClient`. The browser does not receive the token. This is an interim hosting/development seam; interactive Developer login/OIDC/session UX remains future work.
+At the Phase 6 checkpoint, the Developer Nuxt server used a configured private Developer token as a temporary hosting seam. Phase 8 subsequently replaced that seam with interactive Auth0/OIDC login and a Nuxt server-side Developer session while preserving the same request-scoped control-plane authentication boundary.
 
 ## Validation
 
@@ -636,7 +636,7 @@ identity and lifecycle data.
 
 # Phase 8 — Developer Login, OIDC, Session, and Agent Ownership Experience
 
-**Status:** IN PROGRESS — CORE INTERACTIVE FLOW PROVEN
+**Status:** FINAL CHECKPOINT — IMPLEMENTATION AND FOCUSED SECURITY COVERAGE COMPLETE; FULL WORKSPACE VALIDATION PENDING
 
 ## Goal
 
@@ -649,9 +649,9 @@ The current implementation proves:
 ```text
 Developer Browser
     ↓
-Auth0 / OIDC Login
+Auth0 / OIDC Login or Signup
     ↓
-Developer Session / Short-Lived Credential
+Nuxt Developer Session / Short-Lived Credential
     ↓
 Developer Nuxt Server
     ↓
@@ -661,45 +661,61 @@ Hosted Control Plane
     ↓
 canonical M2Oath Developer Account
     ↓
-Developer-authorized Agent registration
+Developer-account lifecycle authorization
     ↓
-canonical Agent
+canonical Agent registration
     ↓
 Developer → Agent owner relationship
     ↓
 ownership-scoped Agent list/detail
 ```
 
-The manual browser acceptance flow has proven:
+Completed Phase 8 work includes:
 
-- signed-out Developer home;
-- Auth0 sign-in;
+- signed-out Developer landing experience;
+- Auth0 OIDC sign-in and signup routes;
 - stable canonical M2Oath Developer Account resolution;
-- Developer dashboard;
-- initially empty ownership-scoped Agent list;
-- Agent registration;
-- canonical Agent creation;
-- persisted Developer→Agent `owner` relationship;
-- ownership-scoped Agent detail;
-- ownership-scoped My Agents list; and
-- sign-out/sign-in with the owned Agent still visible.
+- Developer dashboard and centralized auth middleware for protected pages;
+- Agent registration and persisted Developer→Agent `owner` relationship;
+- ownership-scoped Agent detail and My Agents list;
+- sign-out/sign-in with owned Agent state preserved;
+- automated Developer→Agent ownership acceptance coverage;
+- registration recovery/idempotency when Agent creation succeeds before ownership persistence;
+- Developer-account/role/policy lifecycle authorization replacing the temporary configured-subject seam;
+- real-MySQL proof that active Developers may register while missing/disabled Developers are denied;
+- secure external Auth0 identity linking to one canonical Developer Account;
+- idempotent same-Developer linking and conflict rejection when an external identity belongs to another Developer;
+- normal sign-in through a newly linked identity resolving to the same canonical Developer Account;
+- `/auth/link` session guard so signed-out callers cannot start the linking flow;
+- automated regression coverage for the `/auth/link` session guard;
+- malformed/missing secondary-link credential rejection and unauthenticated primary-request rejection;
+- conflict UX mapping to a Developer-facing link-failed state;
+- Auth0 Universal Login M2Oath branding for login/signup;
+- shared light/dark M2Oath logo assets in the Developer header; and
+- explicit decision not to use OIDC `login_hint` where it could confuse multi-identity linking.
 
-The Developer Account is a M2Oath-owned application/domain identity and remains distinct from the Auth0 identity and from canonical Agent identity.
+The Developer Account is a M2Oath-owned application/domain identity and remains distinct from the Auth0 identity and from canonical Agent identity. External identities are issuer/subject bindings; email is profile data rather than canonical identity.
 
-Developer roles and status are M2Oath-owned state, not authority inferred directly from Auth0 claims.
+Developer roles, status, Agent ownership, and lifecycle authority are M2Oath-owned state, not authority inferred directly from Auth0 claims.
+
+## Authentication Presentation
+
+The Developer Portal now uses a baseline M2Oath visual identity and branded Auth0 Universal Login. A future enhancement may synchronize Auth0 light/dark presentation with the Nuxt color-mode toggle. That theme value is presentation-only and must not affect authentication, canonical identity, authorization, ownership, token issuance, session security, or Trust Container policy.
+
+The same branded authentication experience may later support other human M2Oath account types using server-side sessions without requiring an M2Oath API JWT in browser code.
 
 ## Remaining Work
 
-1. automate the Developer→Agent ownership acceptance flow;
-2. close the registration recovery/idempotency gap where Agent creation could succeed before ownership persistence fails;
-3. replace the temporary configured-subject Agent lifecycle authorization seam with Developer-account/role/policy authorization;
-4. polish login/signup behavior, including signup and login hints where appropriate;
-5. add remaining negative/security tests and route/session UX cleanup; and
-6. update final Phase 8 documentation and run the full workspace checkpoint.
+1. run the final full-workspace Phase 8 checkpoint (`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` as supported by the workspace);
+2. fix any regressions discovered by that checkpoint;
+3. remove temporary/backup artifacts if any remain; and
+4. commit and push the completed Phase 8 checkpoint.
+
+After the full checkpoint is green, change this phase status to **COMPLETE** and begin Phase 9.
 
 ## Security Constraint
 
-The login/session layer must not place Developer credentials in enrollment payloads, reuse Developer credentials as Agent Runtime credentials, or convert JWT scopes into automatic M2Oath authority.
+The login/session layer must not place Developer credentials in enrollment payloads, reuse Developer credentials as Agent Runtime credentials, convert JWT scopes into automatic M2Oath authority, use email as canonical Developer identity, or allow external-identity linking without independently authenticated existing and new identities.
 
 ## Architectural Interpretation
 
@@ -1405,17 +1421,24 @@ Production hardening must be treated as an explicit phase rather than inferred f
 
 # Phase 26 — Branding and Shared Presentation System
 
-**Status:** DEFERRED
+**Status:** DEFERRED FOR FULL DESIGN SYSTEM — BASELINE BRANDING ESTABLISHED
 
 ## Current Decision
 
-Continue using Nuxt UI defaults.
+Continue using Nuxt UI as the baseline while retaining the lightweight M2Oath branding already introduced during Phase 8:
+
+- transparent light- and dark-theme M2Oath logo assets in the Developer header;
+- M2Oath-branded Auth0 Universal Login;
+- current Nuxt green/slate/Public Sans presentation as a provisional baseline; and
+- no speculative shared UI package until reuse is concrete.
+
+A future Auth0 theme synchronization enhancement may carry light/dark presentation context from Nuxt into Auth0-supported Universal Login customization. This is a presentation concern only.
 
 Do not build a speculative design system while the product architecture is still expanding.
 
 ## Future Work
 
-When branding is intentionally scheduled, centralize:
+When broader branding is intentionally scheduled, centralize:
 
 - M2Oath logo;
 - typography;
@@ -1435,26 +1458,24 @@ Shared packages should be introduced only where reuse is real.
 The current ordered engineering queue is:
 
 ```text
-1. Finish Phase 8 Developer OIDC/session/ownership acceptance coverage
-2. Close Agent-registration ownership recovery/idempotency gap
-3. Replace temporary configured-subject authorization seam
-4. Phase 8 authentication/signup/security cleanup and full checkpoint
-5. Classify existing code: PUBLIC TRUST CONTAINER / PROPRIETARY TRUST SERVICE / SHARED CONTRACT
-6. Establish m2oath-agent ↔ m2oath-trust dependency and API boundaries
-7. Define TrustedDomainController interface and registry
-8. Prove m2oath-weather through the generic domain seam
-9. Extract/recompose server-side registration/lifecycle/persistence under m2oath-trust ownership
-10. Agent identity + provenance + cryptographic binding UI
-11. rotate-key and disable lifecycle operations
-12. Agent runtime authentication visibility
-13. Behavior / usage
-14. Accumulated trust
-15. Evidence
-16. Policy outcomes
-17. Trusted Domain product experience
-18. Weather Trusted Domain product experience
-19. KPIs / operations
-20. Pre-publication physical repository separation
+1. Run final Phase 8 full-workspace validation and cleanup
+2. Commit/push Phase 8 as COMPLETE when green
+3. Classify existing code: PUBLIC TRUST CONTAINER / PROPRIETARY TRUST SERVICE / SHARED CONTRACT
+4. Establish m2oath-agent ↔ m2oath-trust dependency and API boundaries
+5. Define TrustedDomainController interface and registry
+6. Prove m2oath-weather through the generic domain seam
+7. Extract/recompose server-side registration/lifecycle/persistence under m2oath-trust ownership
+8. Agent identity + provenance + cryptographic binding UI
+9. rotate-key and disable lifecycle operations
+10. Agent runtime authentication visibility
+11. Behavior / usage
+12. Accumulated trust
+13. Evidence
+14. Policy outcomes
+15. Trusted Domain product experience
+16. Weather Trusted Domain product experience
+17. KPIs / operations
+18. Pre-publication physical repository separation
 ```
 
 This order finishes the currently proven Developer workflow first, then establishes the package/network architecture before richer trust-product work.
@@ -1500,7 +1521,7 @@ The original hosted-platform foundation is complete:
 - hosted control-plane reconstruction preserves canonical Agent state; and
 - workspace regression has remained green at completed architectural checkpoints.
 
-The active foundation work has moved to Phase 8 Developer identity/session/ownership completion and the Phase 9 public Trust Container / proprietary Trust Service separation.
+The active foundation work is at the final Phase 8 full-workspace checkpoint. Once green and committed, development moves to Phase 9 public Trust Container / proprietary Trust Service separation.
 
 ---
 

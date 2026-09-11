@@ -9,13 +9,13 @@ const agentId = computed(
   () => String(route.params.agentId)
 )
 
+definePageMeta({
+  middleware: 'auth'
+})
+
 useSeoMeta({
   title: 'Agent'
 })
-
-const {
-  loggedIn
-} = useUserSession()
 
 const {
   data: agent,
@@ -55,17 +55,8 @@ const {
         </UButton>
       </div>
 
-      <UAlert
-        v-if="!loggedIn"
-        class="mt-8"
-        color="warning"
-        title="Developer authentication required"
-        description="Sign in before viewing Agent state."
-        icon="i-lucide-log-in"
-      />
-
       <UCard
-        v-else-if="status === 'pending'"
+        v-if="status === 'pending'"
         class="mt-8"
       >
         Loading Agent…

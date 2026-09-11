@@ -2,7 +2,7 @@
 
 **Document Type:** Hosted Platform Architecture  
 **Status:** Draft V0.1 — Authoritative Engineering Architecture  
-**Date:** 2026-09-09  
+**Date:** 2026-09-11  
 **Repository:** `m2oath-web`  
 **Related Requirements:** `docs/WEBSITE_REQUIREMENTS.md`
 
@@ -155,13 +155,13 @@ Current platform choices:
 - Vitest for service/package tests;
 - Node.js for the current control-plane HTTP service.
 
-Branding is intentionally deferred.
+A baseline M2Oath brand treatment is now present in the Developer Portal and Auth0 Universal Login, while a full shared design system remains deferred.
 
 The current UI rule is:
 
-> **Use Nuxt UI defaults and keep future visual changes centralized and inexpensive.**
+> **Use Nuxt UI as the baseline, centralize M2Oath brand assets, and avoid speculative design-system coupling.**
 
-Architecture, security boundaries, API contracts, workflow correctness, and tests take precedence over a custom design system.
+The Developer header supports light/dark logo variants. Auth0 Universal Login uses M2Oath branding but remains a separately hosted authentication document. Architecture, security boundaries, API contracts, workflow correctness, and tests continue to take precedence over broader visual-system work.
 
 ---
 
@@ -228,7 +228,7 @@ Authenticated and authorized principal
     -> 201 Created
 ```
 
-The Developer Nuxt application's configured token is currently a private server-side hosting/development seam. A future Developer login/session flow should supply the authenticated Developer's request-scoped credential without changing the control-plane authorization boundary.
+The Developer Nuxt application now obtains the Developer's request-scoped credential through an interactive Auth0/OIDC login and Nuxt server-side session. This replaces the earlier configured-token seam without changing the control-plane authentication or authorization boundary. The credential remains server-side security context and is attached per request.
 
 ---
 
@@ -274,14 +274,17 @@ Package:
 
 The control plane is the shared server-side hosted boundary used by both Developer and Agent applications.
 
-Current endpoints:
+Current endpoints include:
 
 ```text
 GET  /health
 POST /v1/agents
 GET  /v1/agents
 GET  /v1/agents/:agentId
+POST /v1/developers/me/identity-bindings
 ```
+
+Developer-account bootstrap/resolution and ownership-scoped Agent operations are also composed through the hosted control-plane boundary.
 
 Current development port:
 
@@ -302,12 +305,20 @@ The control plane delegates registration through `M2OathAgentRegistrationGateway
 Location: `apps/developer`  
 Package: `@m2oath/developer`
 
-Current routes:
+Current Developer routes include:
 
 ```text
 /
+/dashboard
+/agents
 /agents/new
+/agents/:agentId
+/auth/auth0
+/auth/signup
+/auth/link
 ```
+
+Protected application pages use centralized authentication middleware. `/auth/link` requires an existing Developer session before a second Auth0 login may begin.
 
 Agent registration follows:
 
@@ -330,9 +341,9 @@ Shared Control Plane
 M2Oath authentication + lifecycle authorization + enrollment
 ```
 
-The browser does not generate canonical Agent IDs and does not receive the configured Developer token. The token is held in private Nuxt runtime configuration and attached server-side. The registration route preserves control-plane 401 and 403 outcomes; unexpected upstream failures remain 502 errors.
+The browser does not generate canonical Agent IDs and does not receive the Developer control-plane access token as application data. Auth0/OIDC establishes the authenticated human session; the Nuxt server stores the request-scoped control-plane access token in secure session state and attaches it server-side. Registration preserves control-plane 401 and 403 outcomes; unexpected upstream failures remain upstream/application errors rather than being converted into authority.
 
-This configured token is an interim server-side seam, not the final human login/session design.
+The Developer Account is canonical M2Oath application identity and is distinct from both the Auth0 external identity and canonical Agent identity. Email is profile data, not the canonical Developer key.
 
 ---
 
@@ -428,25 +439,45 @@ The earlier sequential `agt_000001` proof was a scaffold milestone and is no lon
 
 ---
 
-## 13. Remaining Temporary Hosted Scaffold
+## 13. Retired Hosted Scaffolds and Current Developer Authentication
 
-The authoritative registration path is now M2Oath-owned, but one hosted scaffold remains.
+The original hosted scaffolds have been replaced by durable authoritative paths.
 
-### 13.1 Hosted Directory Projection
+### 13.1 Hosted Directory Projection — Retired
 
-The control plane still uses process-local hosted directory state for the current Agent list/detail experience. It is a projection used by the web vertical slice, not the canonical identity issuer. Restarting the process can lose this hosted projection. The reusable durable implementation now exists in `m2oath-agent` through `@m2oath/persistence-mysql`; hosted adoption of that boundary remains pending.
+Agent list/detail reads no longer depend on process-local hosted directory state. The hosted composition uses the domain-neutral `AgentIdentityDirectory` boundary backed by durable MySQL identity state. A fresh hosted composition can reconstruct Agent detail and list state from the same database.
 
 ### 13.2 Canonical ID Issuance — Replaced
 
 Temporary sequential web-issued IDs have been removed from the authoritative registration path. Canonical IDs are issued by M2Oath enrollment using the M2Oath persistence/composition boundary.
 
-### 13.3 Developer Authentication — Connected
+### 13.3 Developer Authentication — Interactive OIDC/Session Connected
 
-Protected registration now requires a Bearer credential. Production composition uses cryptographic JWT verification through `@m2oath/auth-jwt` and exact-principal M2Oath lifecycle authorization for `agent.create`.
+Developer authentication now uses Auth0 Universal Login / OIDC. On successful authentication, the Developer Nuxt server resolves/bootstrap the canonical M2Oath Developer Account through the control-plane client and establishes a Nuxt server-side session containing Developer identity context and a request-scoped control-plane access token.
 
-The current Developer Nuxt token is a private server-side configuration seam. Full interactive Developer OIDC/login/session UX remains future work.
+```text
+Developer Browser
+    ↓
+Auth0 / OIDC
+    ↓
+Nuxt Developer Session
+    ↓ request-scoped Bearer credential
+Developer Nuxt Server
+    ↓
+Hosted Control Plane
+    ↓
+canonical M2Oath Developer Account + authorization
+```
 
-Agent Runtime JWT authentication is a separate principal and remains outside this hosted registration slice.
+Developer roles/status and `agent.create` authority remain M2Oath-owned. Auth0 claims authenticate an external principal but do not directly become M2Oath lifecycle authority.
+
+Agent Runtime JWT authentication remains a separate principal and is not derived from the Developer session.
+
+### 13.4 External Developer Identity Linking
+
+A canonical Developer may link multiple Auth0 identities. Linking requires both an existing authenticated Developer session and a fresh independently authenticated external identity. The control plane authenticates both credentials before creating the binding.
+
+An external identity already bound to another canonical Developer produces a conflict and is not reassigned. The `/auth/link` entry route refuses to start Auth0 unless an existing Developer session is present. Missing or blank secondary credentials fail closed.
 
 ---
 
@@ -734,7 +765,7 @@ The Developer application additionally uses a private server-side `developerToke
 
 The production control plane requires Developer JWT verification configuration for issuer, audience, JWKS URI, and the exact authorized Developer subject.
 
-The browser communicates with its owning Nuxt server route; the Nuxt server communicates with the control plane. This preserves a clean seam for future Developer login/session handling without exposing service credentials or internal topology to browser code.
+The browser communicates with its owning Nuxt server route; the Nuxt server communicates with the control plane. The implemented Developer login/session flow uses this seam so request-scoped credentials stay in server-side session/transport context rather than application payloads or browser-managed control-plane calls.
 
 ---
 
@@ -821,8 +852,22 @@ m2oath.com/
 
 ```text
 developer.m2oath.com/
+developer.m2oath.com/dashboard
+developer.m2oath.com/agents
 developer.m2oath.com/agents/new
+developer.m2oath.com/agents/:agentId
+developer.m2oath.com/auth/auth0
+developer.m2oath.com/auth/signup
+developer.m2oath.com/auth/link
 ```
+
+Protected Developer application pages require a Nuxt Developer session. The identity-linking route additionally requires an existing Developer session before initiating the fresh Auth0 login used to prove the secondary external identity.
+
+### Shared Authentication Presentation
+
+Auth0 Universal Login is branded as M2Oath but remains a separately hosted authentication document. The Developer Portal supports light/dark Nuxt UI color modes with separate transparent M2Oath logo assets. A future Auth0 customization may receive presentation-only light/dark context from the Nuxt OAuth entry route so Universal Login visually follows the user's selected theme.
+
+Theme context must never influence authentication, Developer identity resolution, authorization, ownership, token issuance, session security, or Trust Container policy. The same branded authentication experience may later serve other human M2Oath account types using server-side sessions without exposing an M2Oath API JWT to browser code.
 
 ### Agent
 
@@ -850,13 +895,13 @@ These future locations do not imply that their underlying capabilities are alrea
 
 ## 22. Current Git Checkpoint
 
-The latest committed and pushed checkpoint before the current Phase 6 working tree is:
+The latest committed and pushed hosted-platform checkpoint before the current Phase 8 working tree is:
 
 ```text
-6994bf1  Update 09-07-2026 7:28pm
+34028e8  Update 09-09-2026 2:01pm
 ```
 
-That commit established authoritative M2Oath registration through the hosted control plane. The September 8 Phase 6 authentication/security work documented here is validated and awaiting its next Git checkpoint.
+The current Phase 8 working tree adds the remaining Developer authentication/session hardening, secure external-identity linking coverage, M2Oath/Auth0 branding, light/dark logo presentation, and documentation updates described here. The final full-workspace validation and Phase 8 commit/push remain pending.
 
 ---
 
@@ -866,7 +911,7 @@ The current implementation should advance without forcing a premature physical r
 
 Recommended sequence:
 
-1. finish the current Developer login/OIDC/session and Developer→Agent ownership experience;
+1. complete the final Phase 8 full-workspace validation and cleanup checkpoint;
 2. classify existing M2Oath packages and services as **Public Trust Container**, **Proprietary Trust Service**, or **Shared Contract**;
 3. establish package/dependency boundaries that make `m2oath-agent` and `m2oath-trust` independently extractable;
 4. define the authenticated service/API seam between Trust Containers and `m2oath-trust`;

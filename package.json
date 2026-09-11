@@ -9,6 +9,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
+    "check": "pnpm run build && pnpm run typecheck && pnpm run test && pnpm run lint",
     "dev:web": "pnpm --filter @m2oath/web dev",
     "dev:developer": "pnpm --filter @m2oath/developer dev",
     "dev:agent": "pnpm --filter @m2oath/agent-web dev",

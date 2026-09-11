@@ -8,6 +8,10 @@ import {
 } from 'vitest'
 
 import {
+  ConfiguredAgentLifecycleAuthorizationPolicy
+} from '@m2oath/agent'
+
+import {
   checkMysqlPersistenceConnection,
   createMysqlPersistencePool,
   type Pool
@@ -88,9 +92,21 @@ describe(
           createDurableM2OathHostedComposition({
             authenticationProvider,
 
-            developerPrincipals: [
-              TEST_DEVELOPER_PRINCIPAL
-            ],
+            lifecycleAuthorizationPolicy:
+              new ConfiguredAgentLifecycleAuthorizationPolicy({
+                grants: [
+                  {
+                    principal:
+                      TEST_DEVELOPER_PRINCIPAL,
+
+                    actions: [
+                      'agent.create',
+                      'agent.rotate-key',
+                      'agent.disable'
+                    ]
+                  }
+                ]
+              }),
 
             pool
           })
@@ -154,9 +170,21 @@ describe(
           createDurableM2OathHostedComposition({
             authenticationProvider,
 
-            developerPrincipals: [
-              TEST_DEVELOPER_PRINCIPAL
-            ],
+            lifecycleAuthorizationPolicy:
+              new ConfiguredAgentLifecycleAuthorizationPolicy({
+                grants: [
+                  {
+                    principal:
+                      TEST_DEVELOPER_PRINCIPAL,
+
+                    actions: [
+                      'agent.create',
+                      'agent.rotate-key',
+                      'agent.disable'
+                    ]
+                  }
+                ]
+              }),
 
             pool
           })
