@@ -2,7 +2,7 @@
 
 **Document Type:** Hosted Platform Architecture  
 **Status:** Draft V0.1 — Authoritative Engineering Architecture  
-**Date:** 2026-09-11  
+**Date:** 2026-09-16  
 **Repository:** `m2oath-web`  
 **Related Requirements:** `docs/WEBSITE_REQUIREMENTS.md`
 
@@ -59,7 +59,11 @@ m2oath-trust                       m2oath-weather
     REST/service APIs
 ```
 
-`m2oath-web` is the M2Oath-operated product and presentation layer. Its current `apps/control-plane` implementation is a prototype/evolutionary predecessor of the proprietary `m2oath-trust` service boundary.
+`m2oath-web` is the M2Oath-operated product and presentation layer. Its current `apps/control-plane` implementation is a prototype/evolutionary predecessor of the future **M2Oath Raven** trusted server application/runtime.
+
+Raven is the target hosted API and orchestration runtime for the M2Oath platform. It will host and compose proprietary M2Oath server capabilities such as `@m2oath/trust` and `@m2oath/trust-simulation`, expose authenticated application and trust APIs, and connect to independent Trusted Domain services through explicit authenticated boundaries. Raven does not become protected-operation execution authority.
+
+The physical `m2oath-raven` repository does not yet exist. Raven is therefore a target architecture, not a claim about current deployed topology.
 
 The governing architectural tests are:
 
@@ -501,7 +505,7 @@ cryptographic binding
 durable state
 ```
 
-The architectural destination separates the public Trust Container runtime from proprietary server responsibilities:
+The architectural destination separates the public Trust Container runtime from proprietary server responsibilities. Those proprietary server capabilities are ultimately hosted and composed by Raven:
 
 ```text
 m2oath-agent
@@ -544,6 +548,110 @@ MySQL / durable infrastructure
 
 The physical repository move does not need to occur immediately. Dependency direction must nevertheless allow the persistence implementation to be extracted from the public repository before public npm/repository boundaries are finalized.
 
+
+## 14.2 M2Oath Raven Target Runtime
+
+The future proprietary network server/runtime is named **M2Oath Raven** (`m2oath-raven`).
+
+Raven is the trusted server-side application runtime and API host for the M2Oath platform. It is the target successor to the current hosted `apps/control-plane` process and will compose server-owned M2Oath capabilities behind explicit authenticated interfaces.
+
+Its target responsibilities include ordinary hosted application APIs, lifecycle and security-sensitive application operations delegated to authoritative M2Oath services, trust/history/provenance/policy APIs, Trust Policy Workbench simulation and diagnostics, and Trusted Domain discovery and orchestration.
+
+> **M2Oath Raven is the trusted server-side application runtime and API host for the M2Oath platform. It exposes authenticated application APIs, including ordinary resource CRUD and specialized trust/simulation operations, and connects or orchestrates trusted server services through narrow authority-preserving interfaces.**
+
+Longer term, Raven may serve as a trusted API and orchestration fabric for the AI Machine Economy, connecting AI applications, M2Oath trust services, Trusted Domains, simulation infrastructure, and organizations across explicit authenticated boundaries. This does not make Raven the source of every form of trust authority.
+
+### Raven and proprietary packages
+
+`@m2oath/trust` is the proprietary trust/control-plane implementation package. Raven is the server application/runtime that hosts and composes it.
+
+`@m2oath/trust-simulation` is the proprietary deterministic simulation engine currently being proven in `m2oath-agent`. Its long-term repository ownership belongs with Raven alongside the proprietary trust implementation it exercises.
+
+```text
+TODAY
+
+m2oath-agent
+    ├── @m2oath/agent
+    ├── @m2oath/trust
+    └── @m2oath/trust-simulation
+
+EVENTUAL
+
+m2oath-agent
+    └── public Trust Container contracts/runtime
+
+m2oath-raven
+    ├── Raven API/runtime
+    ├── @m2oath/trust
+    ├── @m2oath/trust-simulation
+    ├── proprietary persistence/composition
+    └── Trusted Domain connectors/registry
+```
+
+The simulation engine may remain temporarily in `m2oath-agent` while its contracts are being proven. A Node/HTTP simulation service should not be added to the public framework repository merely to expose the engine. The HTTP/API boundary belongs in Raven.
+
+### Raven and the Trust Policy Workbench
+
+```text
+Trust Policy Workbench
+        │
+        ▼
+Developer Nuxt server / thin BFF
+        │ authenticated REST / JSON
+        ▼
+M2Oath Raven Simulation API
+        │
+        ▼
+@m2oath/trust-simulation
+        │
+        ▼
+@m2oath/trust
+```
+
+The browser visualizes JSON results and must not import proprietary trust implementations or reproduce trust arithmetic. Simulation does not execute protected Agent operations and does not automatically deploy a simulated Trust Model into production.
+
+Future developer-defined executable Trust Models must not run as arbitrary uploaded TypeScript in Raven's primary server process. Hosted custom executable models require an isolated/sandboxed simulation worker behind a narrow serializable interface.
+
+```text
+DRAFT MODEL
+    ↓
+SIMULATE
+    ↓
+ADVERSARIAL TEST
+    ↓
+COMPARE MODEL VERSIONS
+    ↓
+REVIEW
+    ↓
+APPROVE
+    ↓
+PUBLISH
+    ↓
+PRODUCTION TRUST CONTAINER
+```
+
+### Raven and Trusted Domains
+
+Raven discovers, authenticates, connects to, and orchestrates Trusted Domain services. A Raven deployment may colocate M2Oath-owned domain services, but colocation does not collapse the service or authority boundary.
+
+```text
+M2Oath Raven
+      ├──────── M2Oath Weather
+      ├──────── Finance Trusted Domain
+      ├──────── Logistics Trusted Domain
+      ├──────── Energy Trusted Domain
+      └──────── customer / third-party domains
+```
+
+Trusted Domains remain authoritative for their domain-specific evidence and semantics. Raven does not convert domain evidence directly into protected-operation execution authority.
+
+### Narrow authority-preserving interfaces
+
+> **M2Oath places authority behind narrow trust boundaries. Agents, Trusted Domains, developer tools, and user interfaces exchange explicit requests, evidence, decisions, and diagnostics across those boundaries rather than importing or sharing authority.**
+
+> **Interfaces separate software. Authentication separates trust domains.**
+
+The Trusted Host/Trust Container boundary protects actual execution. The Workbench-to-Raven boundary supports analysis and simulation. Raven-to-domain boundaries protect service/domain authority. None transfers protected-operation execution authority away from the AI Trust Container.
 
 ## 15. AI Trust Container and Network Boundary
 
@@ -730,6 +838,7 @@ M2Oath Core != Weather Domain
 Public Trust Container SDK != Proprietary M2Oath Trust Service
 Repository Co-location != Architectural Coupling
 Server Authority != Local Protected-Operation Execution Authority
+Raven Orchestration != Protected-Operation Execution Authority
 ```
 
 Additionally:
@@ -911,19 +1020,22 @@ The current implementation should advance without forcing a premature physical r
 
 Recommended sequence:
 
-1. complete the final Phase 8 full-workspace validation and cleanup checkpoint;
-2. classify existing M2Oath packages and services as **Public Trust Container**, **Proprietary Trust Service**, or **Shared Contract**;
-3. establish package/dependency boundaries that make `m2oath-agent` and `m2oath-trust` independently extractable;
-4. define the authenticated service/API seam between Trust Containers and `m2oath-trust`;
-5. define and implement the server-side Trusted Domain controller interface and registry;
-6. integrate `m2oath-weather` as the first reference Trusted Domain through that interface rather than through core-specific coupling;
-7. move/extract server-owned registration, lifecycle, behavioral-trust, accumulated-trust, provenance, and persistence implementations behind `m2oath-trust` without changing their authority semantics;
-8. preserve `AgentTrustStateProvider` and `ExternalTrustEvidenceProvider<T>` as explicit Trust Container input paths;
-9. prove that a standalone developer can construct a Trust Container from public packages without receiving proprietary server implementations;
-10. prove that the same Trust Container can optionally consume authenticated M2Oath Trust state and Trusted Domain evidence across the network boundary; and
-11. before public repository/npm boundaries are finalized, physically separate public and proprietary repositories without architectural redesign.
+1. complete and stabilize the Day 10 deterministic Trust simulation engine and Trust Policy Workbench result contracts;
+2. establish Raven as the documented target successor to the current hosted `apps/control-plane` boundary;
+3. create the `m2oath-raven` repository as the trusted Node/server application and API runtime;
+4. expose the first Raven simulation REST/JSON boundary for the Trust Policy Workbench without duplicating trust algorithms;
+5. connect the Developer Nuxt server to Raven through a thin authenticated BFF/client boundary;
+6. keep `@m2oath/trust` and `@m2oath/trust-simulation` in their temporary location until their contracts and dependency boundaries are stable;
+7. extract proprietary trust, simulation, persistence, registration, lifecycle, provenance, and related server-owned implementation into the Raven repository without changing authority semantics;
+8. define Raven's domain-neutral Trusted Domain registry/discovery/connector boundary;
+9. integrate `m2oath-weather` as the first reference Trusted Domain through that interface rather than through core-specific coupling;
+10. preserve `AgentTrustStateProvider` and `ExternalTrustEvidenceProvider<T>` as explicit Trust Container input paths;
+11. prove that a standalone developer can construct a Trust Container from public packages without receiving proprietary server implementations;
+12. prove that the same Trust Container can consume authenticated M2Oath trust state and Trusted Domain evidence across narrow network boundaries;
+13. add isolated/sandboxed simulation-worker infrastructure before hosted Raven accepts arbitrary developer-defined executable TypeScript Trust Models; and
+14. before public repository/npm boundaries are finalized, physically separate public and proprietary repositories without architectural redesign.
 
-The existing `mcp-workspace` may later become a deployment/workspace home for `m2oath-trust` and `m2oath-weather`, but this document does not authorize modifying that repository before the package/service boundaries are proven.
+The existing `mcp-workspace` remains the M2Oath Weather/reference-domain workspace. This document does not authorize moving Raven into that repository or modifying `mcp-workspace` as part of the Raven bootstrap.
 
 
 ## 24. Governing Principle
@@ -967,9 +1079,37 @@ Browser / Developer / Management UI
                  Encapsulated Agent
 ```
 
+The target hosted path adds Raven without changing the execution boundary:
+
+```text
+M2Oath Web / Trust Policy Workbench
+                │
+           thin Nuxt BFF
+                │
+                ▼
+          M2Oath Raven
+        API / orchestration
+          │             │
+          ▼             ▼
+ @m2oath/trust     Trusted Domains
+          │             │
+          └──────┬──────┘
+                 │ authoritative inputs
+                 ▼
+          AI Trust Container
+                 │
+          executable policy
+                 │
+            ALLOW / DENY
+                 │
+                 ▼
+     ProtectedOperationExecutor
+```
+
 The authority model is:
 
-- **`m2oath-trust`** is authoritative for M2Oath server-side identity, lifecycle, behavioral/accumulated trust, provenance, and related trust state.
+- **M2Oath Raven** is the trusted hosted API/application/orchestration runtime. Hosting or orchestrating a capability does not give Raven protected-operation execution authority.
+- **`@m2oath/trust`** is authoritative for M2Oath server-side identity, lifecycle, behavioral/accumulated trust, provenance, and related trust state.
 - **Trusted Domain servers** are authoritative for evidence and semantics within their domains.
 - **The AI Trust Container** is authoritative for local policy evaluation and final protected-operation enforcement for the encapsulated Agent.
 
