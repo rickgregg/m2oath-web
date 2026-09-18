@@ -66,115 +66,76 @@ describe(
 
     function createGateway(
       options?: {
-        authenticatedSubject?: string
-        authenticatedIssuer?: string
-        resolved?: boolean
-        provenanceSubject?: string
-        provenanceIssuer?: string
+        authenticated?: boolean
+        recovered?: boolean
       }
     ) {
+      const assertion = {
+        type:
+          'oauth-subject',
+
+        subject:
+          'developer-123',
+
+        issuer:
+          'https://developer.example',
+
+        authenticatedAt:
+          new Date(
+            '2026-09-09T21:00:00Z'
+          )
+      } as const
+
       const authenticationProvider = {
         authenticate:
-          vi.fn(async () => ({
-            authenticated:
-              true as const,
-
-            assertion: {
-              type:
-                'oauth-subject',
-
-              subject:
-                options?.authenticatedSubject ??
-                'developer-123',
-
-              issuer:
-                options?.authenticatedIssuer ??
-                'https://developer.example',
-
-              authenticatedAt:
-                new Date(
-                  '2026-09-09T21:00:00Z'
-                )
-            }
-          }))
-      }
-
-      const identityResolver = {
-        resolve:
           vi.fn(async () =>
-            options?.resolved === false
+            options?.authenticated === false
               ? {
-                  resolved:
+                  authenticated:
                     false as const,
 
                   reason:
-                    'identity-not-found' as const
+                    'invalid-developer-credential'
                 }
               : {
-                  resolved:
+                  authenticated:
                     true as const,
 
-                  identity
+                  assertion
                 }
           )
       }
 
-      const provenanceStore = {
-        create:
-          vi.fn(),
-
-        findByAgentId:
-          vi.fn(async () => ({
-            agentId:
-              'agt_existing',
-
-            createdBy: {
-              type:
-                'oauth-subject',
-
-              subject:
-                options?.provenanceSubject ??
-                'developer-123',
-
-              issuer:
-                options?.provenanceIssuer ??
-                'https://developer.example'
-            },
-
-            createdAt:
-              new Date(
-                '2026-09-09T21:00:00Z'
-              )
-          }))
+      const recoveryClient = {
+        findRecoverableAgent:
+          vi.fn(async () =>
+            options?.recovered === false
+              ? undefined
+              : identity
+          )
       }
 
       const gateway =
         new M2OathAgentRegistrationRecoveryGateway({
           authenticationProvider,
-          identityResolver,
-          provenanceStore,
-          now:
-            () =>
-              new Date(
-                '2026-09-09T21:30:00Z'
-              )
+          recoveryClient
         })
 
       return {
         gateway,
         authenticationProvider,
-        identityResolver,
-        provenanceStore
+        recoveryClient,
+        assertion
       }
     }
 
     it(
-      'recovers an existing Agent registered by the authenticated principal',
+      'forwards the authenticated principal and Agent identifier to M2Oath Trust',
       async () => {
         const {
           gateway,
-          identityResolver,
-          provenanceStore
+          recoveryClient,
+          assertion
         } =
           createGateway()
 
@@ -183,6 +144,24 @@ describe(
             request,
             authentication
           )
+
+        expect(
+          recoveryClient.findRecoverableAgent
+        ).toHaveBeenCalledWith({
+          identifier: {
+            type:
+              'oauth-client',
+
+            value:
+              'weather-agent-client',
+
+            issuer:
+              'https://agent-issuer.example'
+          },
+
+          principal:
+            assertion
+        })
 
         expect(result).toEqual({
           agentId:
@@ -194,43 +173,39 @@ describe(
           status:
             'active'
         })
-
-        expect(
-          identityResolver.resolve
-        ).toHaveBeenCalledWith({
-          type:
-            'oauth-client',
-
-          subject:
-            'weather-agent-client',
-
-          issuer:
-            'https://agent-issuer.example',
-
-          authenticatedAt:
-            new Date(
-              '2026-09-09T21:30:00Z'
-            )
-        })
-
-        expect(
-          provenanceStore
-            .findByAgentId
-        ).toHaveBeenCalledWith(
-          'agt_existing'
-        )
       }
     )
 
     it(
-      'does not recover when the external identifier does not resolve',
+      'returns undefined when M2Oath Trust finds no recoverable Agent',
+      async () => {
+        const {
+          gateway
+        } =
+          createGateway({
+            recovered:
+              false
+          })
+
+        const result =
+          await gateway.findRecoverableAgent(
+            request,
+            authentication
+          )
+
+        expect(result).toBeUndefined()
+      }
+    )
+
+    it(
+      'does not call M2Oath Trust when human authentication fails',
       async () => {
         const {
           gateway,
-          provenanceStore
+          recoveryClient
         } =
           createGateway({
-            resolved:
+            authenticated:
               false
           })
 
@@ -243,22 +218,18 @@ describe(
         expect(result).toBeUndefined()
 
         expect(
-          provenanceStore
-            .findByAgentId
+          recoveryClient.findRecoverableAgent
         ).not.toHaveBeenCalled()
       }
     )
 
     it(
-      'does not recover an Agent registered by another principal',
+      'maps the canonical Trust identity to the Raven Agent summary',
       async () => {
         const {
           gateway
         } =
-          createGateway({
-            provenanceSubject:
-              'another-developer'
-          })
+          createGateway()
 
         const result =
           await gateway.findRecoverableAgent(
@@ -266,28 +237,16 @@ describe(
             authentication
           )
 
-        expect(result).toBeUndefined()
-      }
-    )
+        expect(result).toEqual({
+          agentId:
+            identity.id,
 
-    it(
-      'requires registration provenance issuer to match the authenticated principal',
-      async () => {
-        const {
-          gateway
-        } =
-          createGateway({
-            provenanceIssuer:
-              'https://other-developer.example'
-          })
+          displayName:
+            identity.displayName,
 
-        const result =
-          await gateway.findRecoverableAgent(
-            request,
-            authentication
-          )
-
-        expect(result).toBeUndefined()
+          status:
+            identity.status
+        })
       }
     )
   }

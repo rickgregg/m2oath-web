@@ -16,9 +16,71 @@ import {
   createControlPlaneServer
 } from '../src/server.js'
 import {
+  DeveloperAccountGateway
+} from '../src/developer/developer-account-gateway.js'
+import {
+  DeveloperAccountService
+} from '../src/developer/developer-account-service.js'
+import type {
+  DeveloperAccount,
+  DeveloperIdentityBinding
+} from '../src/developer/developer-account.js'
+import type {
+  DeveloperAccountStore
+} from '../src/developer/developer-account-store.js'
+import {
+  HostedAgentRegistrationService
+} from '../src/hosted-agent-registration-service.js'
+import {
   createTestM2OathAuthenticationOptions,
   TEST_DEVELOPER_TOKEN
 } from './test-developer-authentication.js'
+
+class TestDeveloperAccountStore
+  implements DeveloperAccountStore
+{
+  private account:
+    DeveloperAccount | undefined
+
+  private binding:
+    DeveloperIdentityBinding | undefined
+
+  async create(
+    account: DeveloperAccount,
+    binding: DeveloperIdentityBinding
+  ): Promise<void> {
+    this.account = account
+    this.binding = binding
+  }
+
+  async findById(
+    developerId: string
+  ): Promise<DeveloperAccount | undefined> {
+    return this.account?.developerId === developerId
+      ? this.account
+      : undefined
+  }
+
+  async findByExternalIdentity(
+    issuer: string,
+    subject: string
+  ): Promise<DeveloperAccount | undefined> {
+    return (
+      this.binding?.issuer === issuer &&
+      this.binding.subject === subject
+    )
+      ? this.account
+      : undefined
+  }
+
+  async addIdentityBinding(
+    _binding: DeveloperIdentityBinding
+  ): Promise<void> {
+    throw new Error(
+      'Not required by identity acceptance tests.'
+    )
+  }
+}
 
 const servers: ReturnType<typeof createControlPlaneServer>[] = []
 
@@ -40,27 +102,104 @@ afterEach(async () => {
 })
 
 async function startControlPlane() {
-  const server = (() => {
-    const m2oath =
-      createM2OathHostedComposition(
-        createTestM2OathAuthenticationOptions()
-      )
+  const authenticationOptions =
+    createTestM2OathAuthenticationOptions()
 
-    const directory =
-      new M2OathAgentDirectory(
-        m2oath.identityDirectory
-      )
+  const m2oath =
+    createM2OathHostedComposition(
+      authenticationOptions
+    )
 
-    const registrationGateway =
-      new M2OathAgentRegistrationGateway({
-        sdk: m2oath.sdk
-      })
+  const directory =
+    new M2OathAgentDirectory(
+      m2oath.identityDirectory
+    )
 
-    return createControlPlaneServer({
-      registrationGateway,
-      directory
+  const registrationGateway =
+    new M2OathAgentRegistrationGateway({
+      sdk: m2oath.sdk
     })
-  })()
+
+  const store =
+    new TestDeveloperAccountStore()
+
+  const now =
+    new Date(
+      '2026-09-08T00:00:00.000Z'
+    )
+
+  await store.create(
+    {
+      developerId:
+        'dev_test-developer',
+
+      status:
+        'active',
+
+      role:
+        'developer',
+
+      createdAt:
+        now,
+
+      updatedAt:
+        now
+    },
+    {
+      developerId:
+        'dev_test-developer',
+
+      issuer:
+        'https://developer.test.m2oath.local',
+
+      subject:
+        'test-developer',
+
+      createdAt:
+        now
+    }
+  )
+
+  const developerAccountGateway =
+    new DeveloperAccountGateway(
+      authenticationOptions.authenticationProvider,
+      new DeveloperAccountService(
+        store
+      )
+    )
+
+  const relationshipService = {
+    assignOwner:
+      async (
+        developerId: string,
+        agentId: string
+      ) => ({
+        developerId,
+        agentId,
+        relationship:
+          'owner' as const,
+
+        createdAt:
+          now
+      })
+  }
+
+  const hostedRegistrationService =
+    new HostedAgentRegistrationService({
+      developerAccountGateway,
+      registrationGateway,
+
+      relationshipService:
+        relationshipService as never
+    })
+
+  const server =
+    createControlPlaneServer({
+      registrationGateway,
+      directory,
+      developerAccountGateway,
+      hostedRegistrationService
+    })
 
   servers.push(server)
 

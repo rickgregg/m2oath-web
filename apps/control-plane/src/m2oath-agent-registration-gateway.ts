@@ -4,7 +4,7 @@ import type {
 } from '@m2oath/control-plane-client'
 
 import type {
-  AuthenticationRequest
+  ExternalIdentityAssertion
 } from '@m2oath/agent'
 
 import {
@@ -24,14 +24,15 @@ export interface M2OathAgentRegistrationGatewayOptions {
 }
 
 /**
- * Hosted adapter from the control-plane registration contract to the
+ * Hosted adapter from Raven's authenticated registration flow to the
  * authoritative M2Oath lifecycle SDK.
  *
- * Authentication is request-scoped. The gateway never owns or caches
- * caller credentials.
+ * The supplied principal has already been authenticated by Raven.
+ * The remote M2Oath transport separately authenticates Raven itself
+ * to the authoritative Trust service.
  *
- * This class never manufactures a canonical Agent ID and never writes a
- * second hosted copy of Agent identity state.
+ * This class never manufactures a canonical Agent ID and never writes
+ * a second hosted copy of Agent identity state.
  */
 export class M2OathAgentRegistrationGateway
   implements AgentRegistrationGateway
@@ -43,11 +44,11 @@ export class M2OathAgentRegistrationGateway
 
   async registerAgent(
     request: RegisterAgentRequest,
-    authentication: AuthenticationRequest
+    principal: ExternalIdentityAssertion
   ): Promise<AgentSummary> {
     const result =
       await this.options.sdk.registerAgent({
-        authentication,
+        principal,
 
         enrollment: {
           displayName:

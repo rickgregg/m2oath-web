@@ -1,13 +1,14 @@
 # M2Oath Raven Architecture
 
-**Document Type:** Hosted Server / Trust-Network Architecture\
-**Status:** Draft V0.1 --- Target Engineering Architecture\
-**Date:** 2026-09-16\
-**Repository:** `m2oath-web` (architecture source of truth until
-`m2oath-raven` exists)\
-**Target Repository:** `m2oath-raven`\
-**Related Documents:** `docs/ARCHITECTURE.md`,
-`docs/ARCHITECTURE_DECISIONS.md`,
+**Document Type:** Hosted Server / Trust-Network Architecture
+**Status:** Draft V0.2 --- Target Engineering Architecture\
+**Date:** 2026-09-17\
+**Repository:** `m2oath-web`\
+**Target Implementation:** M2Oath Raven in `m2oath-web`, preferably as
+an independently deployable Nuxt/Nitro server application. The existing
+`apps/control-plane` is the architectural predecessor and must be
+inspected before creating a separate `apps/raven`. **Related
+Documents:** `docs/ARCHITECTURE.md`, `docs/ARCHITECTURE_DECISIONS.md`,
 `m2oath-agent/docs/M2OATH_STEP_10_DAY_1_15_SEQUENCE.md`
 
 ------------------------------------------------------------------------
@@ -15,368 +16,327 @@
 ## 1. Purpose
 
 This document defines the target engineering architecture of **M2Oath
-Raven**.
+Raven** under the five-component M2Oath platform architecture:
 
-Raven is the future trusted server-side application runtime and API host
-for the M2Oath platform. It exposes authenticated application APIs,
-composes proprietary M2Oath server capabilities, connects to Trusted
-Domain services through explicit authenticated boundaries, and provides
-specialized trust infrastructure such as simulation, diagnostics,
-audit/history, and future Trust Model lifecycle operations.
-
-The physical `m2oath-raven` repository does **not** yet exist. This
-document defines the target boundary before implementation so Raven can
-be created from an explicit authority and dependency model rather than
-evolving accidentally from transport code.
+1.  `m2oath-agent` --- public developer framework and AI Trust Container
+    runtime;
+2.  `m2oath-web` --- hosted product domain, including Users, Accounts,
+    Organizations, Developers, portals, and the Trust Policy Workbench;
+3.  **M2Oath Raven** --- hosted server/API/orchestration runtime,
+    initially implemented with Nuxt/Nitro in `m2oath-web`;
+4.  `m2oath-trust` --- authoritative horizontal Agent trust service;
+5.  `m2oath-weather` --- first authoritative vertical Trusted Domain.
 
 The canonical engineering definition is:
 
-> **M2Oath Raven is the trusted server-side application runtime and API
-> host for the M2Oath platform. It exposes authenticated application
-> APIs, including ordinary resource CRUD and specialized
-> trust/simulation operations, and connects or orchestrates trusted
-> server services through narrow authority-preserving interfaces.**
+> **M2Oath Raven is the trusted server-side application, REST API, and
+> orchestration runtime for the hosted M2Oath platform. It supports
+> M2Oath Web application services and CRUD operations while providing
+> extensible adapters for M2Oath Trust, additional Trust Providers, and
+> Trusted Domain Providers.**
 
-Raven is not the AI Trust Container and does not become
-protected-operation execution authority.
+Raven is not the AI Trust Container, is not the authoritative M2Oath
+Trust algorithm/service, is not a Trusted Domain authority, and does not
+become protected-operation execution authority.
+
+Raven's architectural role is stable even if its implementation
+technology or repository placement changes. Nuxt/Nitro is the preferred
+initial implementation technology, not part of the provider contracts
+themselves.
 
 ------------------------------------------------------------------------
 
 ## 2. Current State and Target State
 
-The current hosted backend exists in `m2oath-web` as:
+The current hosted backend exists in `m2oath-web` as
+`apps/control-plane`. It is a working predecessor of Raven and proves
+hosted Developer/Agent state, authentication boundaries, canonical Agent
+enrollment, ownership-scoped operations, and durable application state.
 
-``` text
-m2oath-web/
-└── apps/
-    └── control-plane/
-```
+Do **not** create a second permanent canonical backend beside it. Before
+creating `apps/raven`, inspect `apps/control-plane` and decide whether
+it should evolve/rename into Raven.
 
-That application is a working hosted control-plane/API prototype. It
-proves shared Developer/Agent state, authentication boundaries,
-canonical Agent enrollment, ownership-scoped operations, and durable
-hosted state.
-
-It is the **architectural predecessor of Raven**, not a second permanent
-backend that should coexist indefinitely with Raven.
-
-Current proprietary implementation packages are also temporarily
-colocated with public framework work while package boundaries are being
-proven:
+Current proprietary Trust implementation is temporarily colocated in
+`m2oath-agent` while package boundaries are proven:
 
 ``` text
 m2oath-agent
 ├── @m2oath/agent
-│       public Trust Container contracts/runtime
-│
+│   └── public Trust Container contracts/runtime
 ├── @m2oath/trust
-│       proprietary trust/control-plane implementation
-│       temporary repository location
-│
+│   └── proprietary/authoritative M2Oath Trust implementation
 └── @m2oath/trust-simulation
-        proprietary deterministic simulation engine
-        temporary repository location
+    └── proprietary deterministic simulation engine
 ```
 
-The target is:
+The target state separates authority:
 
 ``` text
-m2oath-web
-    │
-    ├── Developer
-    ├── Agent
-    └── Trust Policy Workbench
-             │
-             ▼
-        thin Nuxt BFF
-             │
-       authenticated REST / JSON
-             │
-             ▼
-┌───────────────────────────────────────────────────────┐
-│                    M2Oath Raven                       │
-│                                                       │
-│  hosted application/API/orchestration runtime         │
-│                                                       │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │ @m2oath/trust                                   │  │
-│  │ identity • lifecycle • accumulated trust        │  │
-│  │ provenance • policy services • persistence      │  │
-│  └─────────────────────────────────────────────────┘  │
-│                                                       │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │ @m2oath/trust-simulation                        │  │
-│  │ deterministic simulation • diagnostics          │  │
-│  │ adversarial scenarios • Workbench projections   │  │
-│  └─────────────────────────────────────────────────┘  │
-│                                                       │
-│  application services • API controllers               │
-│  authentication/authorization integration             │
-│  Trusted Domain registry/connectors                   │
-│  audit/history/model-management APIs                  │
-└───────────────────────┬───────────────────────────────┘
-                        │
-                authenticated service
-                     boundaries
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-   M2Oath Weather    Finance       Logistics
-          │             │             │
-     M2Oath-hosted   customer      third-party
+                         m2oath-web
+             Users • Accounts • Organizations
+          Developer • Agent • Trust Policy Workbench
+                              │
+                              ▼
+                         M2Oath Raven
+                    Nuxt/Nitro server runtime
+                              │
+               ┌──────────────┴──────────────┐
+               │                             │
+        TrustProvider                TrustedDomainProvider
+               │                             │
+               ▼                             ▼
+         m2oath-trust                 m2oath-weather
+       horizontal authority           vertical authority
+               │                             │
+               ▼                             ▼
+         m2oath_trust                 m2oath_weather
+              DB                            DB
+
+Raven ───────────────────────────────► m2oath_web DB
 ```
 
-Physical extraction should occur after the implementation contracts are
-stable enough that moving them is an extraction exercise rather than an
-architectural redesign.
+`m2oath-trust` owns authoritative M2Oath Trust algorithms/state and
+Trust simulation/certification. `m2oath-weather` owns Weather evidence
+and semantics. Raven owns hosted application/API orchestration and its
+Web application persistence.
+
+Physical extraction should follow stable contracts and a component-level
+ownership matrix rather than blind package movement.
 
 ------------------------------------------------------------------------
 
 ## 3. Raven Is an Application Runtime, Not a Trust Algorithm
 
-Raven and `@m2oath/trust` are different architectural concepts.
+Raven and `m2oath-trust` are different architectural authorities.
 
-`@m2oath/trust` contains proprietary M2Oath trust/control-plane
-implementation.
-
-Raven is the network-facing server application/runtime that **hosts,
-composes, secures, and exposes** that implementation.
+Raven is the network-facing hosted application/API/orchestration
+runtime. M2Oath Trust is an independently authoritative horizontal Trust
+service.
 
 ``` text
-                    m2oath-raven
+                    M2Oath Raven
                          │
-       ┌─────────────────┼─────────────────┐
-       │                 │                 │
-       ▼                 ▼                 ▼
- API/controllers   application services  service adapters
-                         │
-                         ▼
-                   @m2oath/trust
-                         │
-                         ▼
-                 persistence/adapters
+          ┌──────────────┼──────────────┐
+          │              │              │
+    API/controllers  application   provider registry
+                       services          │
+                                         ▼
+                                  TrustProvider
+                                         │
+                                         ▼
+                                   m2oath-trust
 ```
 
-Trust algorithms must not be copied into Raven controllers, HTTP routes,
-UI-specific services, or transport clients.
+Raven must not import/copy authoritative accumulated-trust algorithms
+into controllers, routes, UI services, or orchestration code.
 
-The same rule applies to simulation. Raven exposes simulation
-operations, but `@m2oath/trust-simulation` remains the simulation engine
-and exercises the real M2Oath trust implementation.
+The same ownership rule applies to simulation:
+
+``` text
+Workbench → Raven → M2Oath Trust Service → Trust Simulation → real Trust logic
+```
+
+Raven exposes and orchestrates simulation operations; `m2oath-trust`
+owns the simulation/certification infrastructure and authoritative Trust
+implementation.
 
 > **Raven orchestrates M2Oath. It does not redefine M2Oath.**
 
 ------------------------------------------------------------------------
 
-## 4. Hosted Application Boundary
+## 4. Hosted Application Boundary and Nuxt/Nitro
 
-M2Oath web applications should not become independent backend systems.
+`m2oath-web` owns the hosted product domain, including:
 
-The preferred path is:
+-   Users;
+-   Accounts;
+-   Organizations;
+-   memberships;
+-   Developer profiles;
+-   account settings;
+-   hosted Agent application resources;
+-   Trust Policy Workbench product state;
+-   hosted product administration.
+
+The rule is:
+
+> **M2Oath Web owns what hosted product resources mean. Raven owns how
+> the server side serves and orchestrates them.**
+
+Raven should initially be implemented with **Nuxt/Nitro** inside
+`m2oath-web`, preferably as an independently deployable server
+application.
 
 ``` text
-Browser
-   │
-   ▼
+Browser / Web UI
+       │
+       ▼
 Nuxt application
-   │
-   ▼
-Nuxt server / thin BFF
-   │
-   │ authenticated request
-   ▼
-M2Oath Raven
+       │
+       ▼
+Raven / Nitro HTTP boundary
+       │
+       ▼
+Raven application services
+       │
+       ├── repositories ─────────────► m2oath_web
+       ├── TrustProvider ─────────────► m2oath-trust
+       └── TrustedDomainProvider ─────► m2oath-weather / others
 ```
 
-The Nuxt BFF may:
+Nitro may provide HTTP handlers, middleware, deployment/runtime
+infrastructure, and browser-facing session integration. Core Raven
+application and provider contracts must remain framework-independent; do
+not leak `H3Event` or other Nitro-specific request types into those
+contracts.
+
+The existing Developer/Agent Nuxt BFF pattern may be simplified as Raven
+evolves. The important boundary is not an extra network hop for its own
+sake; it is that browser-facing code cannot acquire Trust/Domain
+authority or backend service credentials.
+
+Raven/Nitro may:
 
 -   maintain browser-facing session context;
--   protect browser credentials from direct backend exposure;
--   translate UI-friendly calls into typed Raven API requests;
--   preserve upstream authentication/authorization errors;
--   perform presentation-oriented aggregation where appropriate.
+-   authenticate and authorize hosted application requests;
+-   protect backend credentials;
+-   invoke Raven application services;
+-   expose typed REST/JSON contracts;
+-   compose UI responses from multiple authorities.
 
-The Nuxt BFF must not:
+It must not:
 
--   issue canonical Agent identity;
--   calculate authoritative trust;
--   implement M2Oath lifecycle policy;
+-   manufacture canonical Agent identity;
+-   calculate authoritative accumulated Trust;
 -   manufacture domain evidence;
 -   reproduce simulation algorithms;
--   become a second control plane; or
+-   become a second competing control plane;
 -   execute protected Agent operations.
-
-The long-term transition is:
-
-``` text
-CURRENT
-
-Developer / Agent
-       ↓
-apps/control-plane
-
-
-TARGET
-
-Developer / Agent / Workbench
-       ↓
-thin Nuxt BFF
-       ↓
-M2Oath Raven
-```
-
-The existing control-plane client may evolve into or be replaced by a
-Raven-oriented typed client once concrete API boundaries justify the
-change. Naming should follow implementation rather than forcing a
-premature transport refactor.
 
 ------------------------------------------------------------------------
 
 ## 5. Raven API Classes
 
-Raven exposes more than one kind of operation. These should remain
-conceptually distinct even when they share HTTP infrastructure.
+Raven has two primary API personalities even when both use the same
+Nitro HTTP infrastructure.
 
-### 5.1 Application Resource APIs
+### 5.1 Hosted Application Resource APIs
 
-Normal hosted application resources may include:
+Resources may include:
 
--   Developers;
+-   Users;
+-   Accounts;
 -   Organizations;
--   Agents;
--   ownership and membership relationships;
+-   memberships;
+-   Developers;
+-   Agents/application-resource metadata;
+-   ownership relationships;
 -   API credentials;
--   Agent credential/binding metadata;
--   Trust Model metadata and configuration;
+-   Trust Model metadata/configuration;
+-   provider registrations;
 -   Trusted Domain registrations;
--   model versions;
--   administrative configuration; and
--   other hosted product resources.
+-   Workbench projects/scenarios;
+-   administrative configuration.
 
-Conceptually:
-
-``` text
-GET    /v1/agents
-POST   /v1/agents
-GET    /v1/agents/:agentId
-
-GET    /v1/organizations
-POST   /v1/organizations
-
-GET    /v1/trust-models
-POST   /v1/trust-models
-```
-
-These paths are illustrative, not frozen API contracts.
-
-Ordinary resource operations still pass through application/service
-boundaries. A security-sensitive lifecycle operation must not be reduced
-to arbitrary SQL merely because an HTTP API resembles CRUD.
-
-For example:
+Illustrative routes:
 
 ``` text
-POST /v1/agents/:agentId/disable
-            │
-            ▼
-Raven application service
-            │
-            ▼
-authoritative lifecycle service
-            │
-       authorization
-       state transition
-       audit/provenance
+GET/POST  /api/users
+GET/POST  /api/accounts
+GET/POST  /api/organizations
+GET/POST  /api/agents
+GET/POST  /api/credentials
+GET/POST  /api/trust-models
+GET/POST  /api/providers
+GET/POST  /api/trusted-domains
+GET/POST  /api/workbench/...
 ```
 
-### 5.2 Specialized Trust APIs
+Exact routes are not frozen.
 
-Raven may expose specialized operations such as:
+Security-sensitive lifecycle operations remain application/service
+operations, not arbitrary SQL.
 
--   accumulated trust retrieval;
--   trust history;
--   evidence history;
--   provenance;
--   audit;
--   Trust Model evaluation;
--   diagnostics;
--   policy/model metadata;
--   model-version comparison; and
--   future certification/adversarial-test results.
+### 5.2 Trust and Domain Orchestration APIs
 
-These APIs expose or orchestrate authoritative services. They do not
-move trust calculation authority into HTTP controllers.
-
-### 5.3 Simulation APIs
-
-Raven is the correct network host for the Trust Policy Workbench
-simulation boundary.
-
-Conceptually:
+Illustrative operations:
 
 ``` text
-GET  /v1/trust-simulations/scenarios
-POST /v1/trust-simulations/run
+GET/POST  /api/trust/state
+GET       /api/trust/history
+POST      /api/trust/evaluate
+
+GET       /api/domains
+POST      /api/domains/:domain/evidence
+
+GET/POST  /api/simulations
+POST      /api/simulations/:id/run
+GET       /api/simulations/:id/results
 ```
 
-Exact routes are deferred until Raven implementation begins.
+These endpoints call authority-preserving providers/services. Raven does
+not become the underlying Trust or Domain authority.
+
+### 5.3 Composite APIs
+
+A Raven endpoint may compose a UI response from multiple authorities.
+
+Example Agent details:
+
+``` text
+Raven-owned application metadata ─────► m2oath_web
+canonical identity / Trust state ─────► TrustProvider
+Weather evidence ─────────────────────► TrustedDomainProvider
+                                       │
+                                       ▼
+                               unified Raven DTO
+```
+
+A unified DTO does **not** imply unified authority.
 
 ------------------------------------------------------------------------
 
 ## 6. Trust Policy Workbench Architecture
 
-The Trust Policy Workbench belongs to `m2oath-web`.
-
-The deterministic simulation engine belongs on the trusted server side.
+The Trust Policy Workbench belongs to `m2oath-web`. The authoritative
+Trust simulation engine belongs with `m2oath-trust`.
 
 ``` text
 Trust Policy Workbench
         │
-        │ scenario / model / parameters
-        ▼
-Nuxt thin BFF
-        │
         │ authenticated REST / JSON
         ▼
-Raven Simulation API
+M2Oath Raven
         │
         ▼
-@m2oath/trust-simulation
+M2OathTrustAdapter / TrustProvider
         │
         ▼
-@m2oath/trust
+m2oath-trust Service API
+        │
+        ▼
+Trust Simulation / Certification
+        │
+        ▼
+real M2Oath Trust implementation
 ```
 
-The browser receives JSON-safe simulation projections and visualizes
-them.
+When a simulation requires Trusted Domain evidence, Raven and the Trust
+service must use an authority-preserving orchestration contract; domain
+evidence remains independently authoritative and must not be folded into
+accumulated behavioral trust.
 
-It may display:
+The browser receives JSON-safe projections and may visualize trust
+evolution, raw activity vs effective evidence, evidence
+count/weight/diversity, usage/behavioral/composite Trust, ALLOW/DENY
+decisions, reasons, diagnostics, timelines, attacks, stale/replayed
+evidence, Trusted Domain evidence, and model/version comparisons.
 
--   trust evolution;
--   raw activity versus effective evidence;
--   evidence count;
--   effective evidence weight;
--   meaningful diversity;
--   usage trust;
--   behavioral trust;
--   composite trust;
--   ALLOW/DENY decisions;
--   decision reasons;
--   evidence contribution diagnostics;
--   event/evaluation timelines;
--   attack behavior;
--   stale/replayed evidence effects; and
--   Trusted Domain evidence presented independently from accumulated
-    behavioral trust.
-
-The browser must not approximate, recalculate, or reinterpret
-authoritative trust mathematics.
-
-The governing product principle is:
+The browser must not approximate or recalculate authoritative Trust
+mathematics.
 
 > **M2Oath should make Agent trust observable, not merely calculable.**
-
-And the simulation principle is:
 
 > **The simulation framework observes M2Oath. It does not redefine
 > M2Oath.**
@@ -574,57 +534,99 @@ by itself protected-operation execution authority.
 
 ------------------------------------------------------------------------
 
-## 11. Raven and Trusted Domains
+## 11. Raven Provider Architecture
 
-Trusted Domains are independent authorities for domain-specific evidence
-and semantics.
-
-Examples include:
+Raven must support two first-class extension axes.
 
 ``` text
-M2Oath Weather
-Finance
-Logistics
-Energy
-Mobility
-Insurance
-Commerce
-customer-defined domains
-third-party domains
+                         Raven
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+        Trust Providers          Trusted Domains
+         horizontal                 vertical
+              │                         │
+       Agent trust state         domain evidence
 ```
 
-Raven is connective infrastructure between authenticated callers and
-these services.
+### 11.1 Trust Providers
+
+The first reference Trust Provider is `m2oath-trust`.
+
+Future examples may include enterprise Agent governance, customer
+private Trust, partner Trust, or consortium authorities.
+
+Conceptual contract:
+
+``` ts
+interface TrustProvider {
+  readonly providerId: string;
+
+  getAgentTrustState(
+    request: AgentTrustStateRequest
+  ): Promise<AgentTrustState>;
+}
+```
+
+### 11.2 Trusted Domain Providers
+
+The first reference Trusted Domain is `m2oath-weather`.
+
+Future examples include Finance, Logistics, Energy, Mobility, Insurance,
+Aviation, Agriculture, Manufacturing, customer domains, and third-party
+domains.
+
+Conceptual contract:
+
+``` ts
+interface TrustedDomainProvider<TEvidence> {
+  readonly providerId: string;
+  readonly domain: string;
+
+  getEvidence(
+    request: TrustedDomainEvidenceRequest
+  ): Promise<TEvidence>;
+}
+```
+
+These are conceptual contracts; exact types are a Raven design task.
+
+### 11.3 Provider Registry
+
+The registry should support:
+
+-   provider identity/name/type;
+-   domain where applicable;
+-   endpoint;
+-   authentication method;
+-   capabilities;
+-   evidence/schema version;
+-   health;
+-   provenance characteristics;
+-   supported transports.
+
+### 11.4 Provider Adapters
+
+Adapters own transport, authentication, serialization, timeout/retry,
+capability discovery, contract translation, failure mapping, and
+provenance propagation.
+
+Adapters are not authorities.
+
+Reference providers prove the extensibility model. Raven core must not
+contain provider-name conditionals for M2Oath Trust or Weather.
+
+### 11.5 Service API and MCP
+
+An authority may expose both:
 
 ``` text
-                    M2Oath Raven
-                         │
-                 Domain Registry
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-       Weather        Finance       Logistics
-          │              │              │
-       evidence        evidence       evidence
-       semantics       semantics      semantics
-       provenance      provenance     provenance
+Authority
+   ├── authenticated Service API ───► Raven / Trust Container providers
+   └── MCP Adapter ─────────────────► AI/MCP clients
 ```
 
-Raven may provide:
-
--   Trusted Domain registration;
--   service discovery;
--   endpoint metadata;
--   authentication configuration;
--   authenticated request orchestration;
--   request correlation;
--   timeout/error handling;
--   provenance transport;
--   domain capability metadata; and
--   audit visibility.
-
-Raven must not reinterpret a domain's factual semantics as if Raven were
-that domain authority.
+MCP is an interface to authority, not the authority itself.
 
 ------------------------------------------------------------------------
 
@@ -758,6 +760,12 @@ A related principle is:
 > **Interfaces separate software. Authentication separates trust
 > domains.**
 
+> **Database ownership follows authority ownership.**
+
+> **Deployment topology does not collapse authority boundaries.**
+
+> **M2Oath federates authorities rather than absorbing them.**
+
 An interface alone is not a trust boundary. Authentication,
 authorization, provenance, and explicit authority semantics are required
 when crossing independently trusted systems.
@@ -867,38 +875,44 @@ M2Oath authority mapping grants a capability.
 
 ------------------------------------------------------------------------
 
-## 17. Persistence Boundary
+## 17. Persistence Boundary and Database Ownership
 
-Raven will ultimately compose proprietary persistence infrastructure,
-but the database does not become policy authority.
+Database ownership follows authority ownership.
+
+Initial physical deployment may use one MySQL server/container with
+three logically isolated databases:
 
 ``` text
-Raven
-   │
-   ▼
-@m2oath/trust / authoritative application services
-   │
-   ▼
-persistence adapters
-   │
-   ▼
-durable database
+MySQL
+├── m2oath_web
+├── m2oath_trust
+└── m2oath_weather
 ```
 
-Persistence stores durable facts and transaction state.
+Use least-privilege database users:
 
-It does not independently decide:
+``` text
+raven_web_user  → m2oath_web.* only
+trust_user      → m2oath_trust.* only
+weather_user    → m2oath_weather.* only
+```
 
--   canonical identity policy;
--   lifecycle policy;
--   authorization;
--   trust policy;
--   Trusted Domain semantics; or
--   protected-operation execution.
+Hard rules:
 
-Existing persistence engineering may be physically extracted with the
-proprietary server implementation when repository boundaries are
-finalized.
+-   Raven must not SQL-query `m2oath_trust`;
+-   Raven must not SQL-query `m2oath_weather`;
+-   Trust must not SQL-query `m2oath_weather`;
+-   Weather must not SQL-query `m2oath_trust`;
+-   cross-authority communication occurs through authenticated service
+    interfaces;
+-   physical co-location does not collapse authority.
+
+Persistence stores durable facts and transaction state. It does not
+independently decide identity policy, lifecycle policy, authorization,
+Trust policy, Domain semantics, or protected execution.
+
+The logical boundaries permit later physical separation into dedicated
+database servers/clusters without changing service contracts.
 
 ------------------------------------------------------------------------
 
@@ -1011,103 +1025,90 @@ Private and factual evidence should remain primarily off-chain.
 
 ------------------------------------------------------------------------
 
-## 21. Target Repository Boundary
+## 21. Target Repository and Ownership Boundary
 
-When created, the initial Raven repository should be a focused trusted
-server application rather than an immediate dumping ground for every
-proprietary package.
+Raven is currently targeted to remain in `m2oath-web`.
 
 Conceptually:
 
 ``` text
-m2oath-raven/
+m2oath-web/
 ├── apps/
-│   └── raven/
-│       └── trusted Node/API runtime
-│
+│   ├── developer/
+│   ├── agent/
+│   └── control-plane or raven/   # decide after inspection
 ├── packages/
-│   ├── trust/
-│   ├── trust-simulation/
-│   ├── persistence/
-│   ├── persistence-mysql/
-│   └── server-specific adapters/contracts as justified
-│
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── API.md
-│   └── SECURITY.md
-│
-├── package.json
-└── pnpm-workspace.yaml
+│   └── Raven/Web application contracts and clients as justified
+└── docs/
+    └── Raven + hosted platform architecture
 ```
 
-This is a target shape, not a frozen repository tree.
+Do not move `@m2oath/trust`, `@m2oath/trust-simulation`, or
+authoritative Trust persistence into Raven merely because they are
+proprietary. They belong with the `m2oath-trust` authority after
+classification/extraction.
 
-Extraction should preserve package boundaries and tests. It should not
-require rewriting trust algorithms.
+Likewise, Weather-specific implementation belongs with `m2oath-weather`.
 
-Public packages that developers require to construct and run Trust
-Containers remain outside the proprietary Raven repository.
+Public packages developers require to construct/run Trust Containers
+remain in the public `m2oath-agent` framework.
 
 ------------------------------------------------------------------------
 
 ## 22. Migration Strategy
 
-The migration should be incremental.
+Migration is incremental and test-gated.
 
-### Stage 1 --- Prove contracts
+### Stage 1 --- Freeze architecture and provider contracts
 
-Continue proving `@m2oath/trust` and `@m2oath/trust-simulation`
-boundaries without introducing cross-repository friction prematurely.
+Reconcile platform/Raven ADRs, inspect the existing control-plane, and
+define framework-independent TrustProvider/TrustedDomainProvider
+contracts.
 
-### Stage 2 --- Create Raven
+### Stage 2 --- Inventory and ownership matrix
 
-Create the `m2oath-raven` repository with a minimal trusted Node/API
-runtime, health endpoint, authentication/composition structure, tests,
-and documentation.
+Inventory `m2oath-agent`, `m2oath-web`, and `mcp-workspace`. Classify
+components as KEEP IN AGENT, MOVE TO TRUST, MOVE TO WEATHER, MOVE TO
+RAVEN, SPLIT, or REVIEW.
 
-### Stage 3 --- First Raven vertical slice
+### Stage 3 --- Split Trust public/proprietary code in place
 
-Use Trust Policy Workbench simulation as a strong first specialized
-Raven API:
+Preserve public developer contracts while isolating proprietary
+authoritative implementation. Run full regression.
 
-``` text
-Workbench
-   ↓
-Nuxt BFF
-   ↓
-Raven
-   ↓
-trust-simulation
-   ↓
-trust
-```
+### Stage 4 --- Establish `m2oath-trust`
 
-This proves the browser/proprietary boundary without requiring protected
-Agent execution.
+Extract authoritative Trust implementation, persistence,
+simulation/certification, authenticated Service API, and optional MCP
+adapter.
 
-### Stage 4 --- Migrate hosted control-plane operations
+### Stage 5 --- Recast `mcp-workspace` as `m2oath-weather`
 
-Move the durable hosted application responsibilities currently proven by
-`m2oath-web/apps/control-plane` behind Raven.
+Preserve Weather ingestion, verification, evidence/trust, persistence,
+and MCP; add authenticated Weather Service API and reposition MCP as an
+adapter.
 
-Avoid running two independent canonical control planes.
+### Stage 6 --- Evolve the hosted control-plane into Raven
 
-### Stage 5 --- Extract proprietary packages
+Use Nuxt/Nitro, application services, `m2oath_web` repositories,
+provider registry, and reference Trust/Weather adapters. Avoid two
+canonical backends.
 
-Move server-owned trust, simulation, persistence, lifecycle, provenance,
-and related implementation to the Raven repository when dependency
-direction is stable.
+### Stage 7 --- Establish database isolation
 
-### Stage 6 --- Connect Trusted Domains
+Create/verify the three logical databases, least-privilege users, and
+cross-database denial tests.
 
-Add the domain-neutral registry/connector boundary and connect M2Oath
-Weather as the first reference domain.
+### Stage 8 --- Connect Workbench and simulation
 
-### Stage 7 --- Advanced model lifecycle
+Workbench → Raven → M2Oath Trust Service. Preserve domain authority and
+simulation non-authority.
+
+### Stage 9 --- Advanced model lifecycle and provider ecosystem
 
 Add adversarial certification, model comparison, isolated custom-model
-simulation workers, review/approval, and publishing infrastructure.
+workers, review/approval/publishing, and third-party provider
+onboarding.
 
 ------------------------------------------------------------------------
 
@@ -1158,62 +1159,136 @@ Additional invariants:
 9.  Raven treats authoritative-evidence outage differently from valid
     empty evidence.
 10. Raven keeps protected execution local to the Trust Container.
+11. Raven does not directly query Trust or Trusted Domain databases.
+12. Provider transport does not change provider authority semantics.
+13. Reference Trust/Weather providers can be replaced by compatible
+    providers without modifying Raven orchestration core.
+14. Provider outage is distinct from legitimate empty evidence or
+    cold-start state.
+15. MCP reasoning/tool access cannot bypass provider/policy enforcement.
+
+------------------------------------------------------------------------
+
+## 23A. Deployment and Scalability
+
+Authority boundaries are deliberately independent from deployment
+topology.
+
+### Initial pilot
+
+``` text
+                    INTERNET
+                       │
+                       ▼
+              ┌──────────────────┐
+              │    DROPLET A     │
+              │ Caddy            │
+              │ m2oath-web       │
+              │ Raven / Nitro    │
+              │ m2oath-trust     │
+              │ m2oath-weather   │
+              │ separate Docker  │
+              │ containers       │
+              └────────┬─────────┘
+                       │ private network
+                       ▼
+              ┌──────────────────┐
+              │    DROPLET B     │
+              │ MySQL            │
+              │ m2oath_web       │
+              │ m2oath_trust     │
+              │ m2oath_weather   │
+              └──────────────────┘
+```
+
+A managed MySQL service is compatible with the same model.
+
+### Horizontal Raven scaling
+
+Raven should avoid authoritative process-local state and scale behind a
+load balancer.
+
+### Independent Trust scaling
+
+Trust API/application nodes can scale independently against
+authoritative Trust persistence.
+
+### Independent Weather scaling
+
+Weather can scale its API separately from forecast-ingestion,
+observation-ingestion, and verification workers.
+
+### Simulation scaling
+
+Population-scale simulation should eventually use dedicated
+workers/queues rather than consuming the normal Trust API process. Step
+10 Day 11 measurements determine when this is necessary.
+
+### MCP scaling
+
+Service APIs and MCP adapters may initially share a process but can
+later deploy independently without changing authority semantics.
+
+### Federation as scale
+
+Raven and Trust Containers may consume M2Oath-owned, customer-owned, and
+third-party providers. M2Oath therefore scales not only by adding
+infrastructure but by federating independently authoritative services.
+
+### Deployment progression
+
+1.  Application droplet + database droplet.
+2.  Separate Web/Raven, Trust, or Weather compute when measurements
+    justify it.
+3.  Load-balanced services, dedicated workers, and dedicated databases.
+4.  Multi-region and federated customer/third-party authorities.
+
+The provider/service contracts must survive every stage unchanged in
+their authority semantics.
 
 ------------------------------------------------------------------------
 
 ## 24. Governing Architecture
 
-The target M2Oath architecture is:
-
 ``` text
-                 DEVELOPERS / ORGANIZATIONS
+                  DEVELOPERS / ORGANIZATIONS
                            │
                            ▼
-                    M2Oath Web
-       Developer • Agent • Trust Policy Workbench
-                           │
-                     thin Nuxt BFF
+                       m2oath-web
+      Users • Accounts • Developer • Agent • Workbench
                            │
                            ▼
-════════════════════════════════════════════════════════════
-                 HOSTED TRUST/API BOUNDARY
-════════════════════════════════════════════════════════════
+                     M2Oath Raven
+                Nuxt/Nitro API/orchestration
                            │
-                           ▼
-                    M2Oath Raven
-                API / orchestration fabric
-                           │
-       ┌───────────────────┼────────────────────┐
-       │                   │                    │
-       ▼                   ▼                    ▼
-@m2oath/trust    @m2oath/trust-simulation  Trusted Domains
-       │                   │               │    │    │
- identity              scenarios         Weather Finance ...
- lifecycle             diagnostics
- behavioral trust      adversarial tests
- accumulated trust
- provenance
- persistence
-       │                   │                    │
-       └───────────────────┼────────────────────┘
+             ┌─────────────┴─────────────┐
+             │                           │
+       TrustProvider             TrustedDomainProvider
+             │                           │
+             ▼                           ▼
+       m2oath-trust               m2oath-weather
+       identity/trust             Weather evidence
+       simulation/certification   domain semantics
+             │                           │
+             └─────────────┬─────────────┘
                            │
                     authoritative inputs
                            │
                            ▼
 ════════════════════════════════════════════════════════════
-              DEVELOPER / CUSTOMER RUNTIME
+                 DEVELOPER / CUSTOMER RUNTIME
 ════════════════════════════════════════════════════════════
                            │
                            ▼
-                   AI TRUST CONTAINER
-                     @m2oath/agent
+                    AI TRUST CONTAINER
+                      @m2oath/agent
                            │
-                  executable policy
+                    executable policy
                            │
-                     ALLOW / DENY
+                      ALLOW / DENY
                            │
                            ▼
-                ProtectedOperationExecutor
+                 ProtectedOperationExecutor
                            │
                     only if permitted
                            ▼
@@ -1222,11 +1297,40 @@ The target M2Oath architecture is:
 
 The core authority rule is:
 
-> **Raven may authenticate, expose, compose, coordinate, simulate,
-> diagnose, and orchestrate. M2Oath Trust remains authoritative for
-> M2Oath trust state. Trusted Domains remain authoritative for their
-> domain evidence and semantics. The AI Trust Container remains
-> authoritative for final protected-operation enforcement.**
+> **Raven may authenticate, expose, compose, coordinate, diagnose, and
+> orchestrate. M2Oath Trust remains authoritative for M2Oath Trust state
+> and Trust simulation/certification. Trusted Domains remain
+> authoritative for their domain evidence and semantics. The AI Trust
+> Container remains authoritative for final protected-operation
+> enforcement.**
+
+------------------------------------------------------------------------
+
+## 24A. V0.2 Architecture Changes
+
+V0.2 supersedes the earlier assumption that Raven directly hosts
+proprietary Trust implementation and simulation as its authority.
+
+Changes include:
+
+-   Raven remains in `m2oath-web` for now;
+-   Nuxt/Nitro is the preferred initial Raven implementation;
+-   Users and Accounts are explicitly part of the `m2oath-web` product
+    domain;
+-   `m2oath-trust` becomes a distinct horizontal authority/service;
+-   `m2oath-weather` becomes the first distinct Trusted Domain;
+-   Raven gains first-class `TrustProvider` and `TrustedDomainProvider`
+    extension axes;
+-   Trust/Weather connect through authenticated provider/service
+    boundaries;
+-   Trust simulation/certification belongs to `m2oath-trust`,
+    orchestrated by Raven;
+-   persistence is split into `m2oath_web`, `m2oath_trust`, and
+    `m2oath_weather`;
+-   Raven cannot query Trust/Weather databases directly;
+-   the deployment/scalability model explicitly supports independent
+    service scaling, workers, database extraction, MCP scaling, and
+    federation.
 
 ------------------------------------------------------------------------
 
@@ -1244,6 +1348,12 @@ The Raven architecture is governed by five principles:
 > **Interfaces separate software. Authentication separates trust
 > domains.**
 
+> **Database ownership follows authority ownership.**
+
+> **Deployment topology does not collapse authority boundaries.**
+
+> **M2Oath federates authorities rather than absorbing them.**
+
 > **M2Oath places authority behind narrow trust boundaries. Agents,
 > Trusted Domains, developer tools, and user interfaces exchange
 > explicit requests, evidence, decisions, and diagnostics across those
@@ -1254,3 +1364,35 @@ And above all:
 > **Neither Raven, M2Oath Trust, nor a Trusted Domain may bypass the AI
 > Trust Container. Protected Agent execution occurs only through the
 > Trust Container's `ProtectedOperationExecutor` boundary.**
+
+------------------------------------------------------------------------
+
+## 22. Day 10E.5 Raven Boundary Seal --- 2026-09-18
+
+Day 10E.5 is complete.
+
+`apps/control-plane` is Raven's physical predecessor. It should evolve
+into Raven after Trust authority is extracted; do not create a competing
+permanent `apps/raven` first.
+
+The principal current authority leak is the direct dependency on
+`@m2oath/persistence-mysql`.
+
+``` text
+Raven Web persistence
+    └── Raven-owned mysql2 infrastructure → m2oath_web
+
+Raven Trust operations
+    └── remote adapter → authenticated HTTPS → m2oath-trust
+```
+
+Raven retains Web product/resource authorization, then conveys delegated
+lifecycle requests. M2Oath Trust remains authoritative for canonical
+lifecycle transitions.
+
+Raven adapters implement public M2Oath provider semantics rather than
+duplicate them. Raven integration tests must stop manipulating
+`m2oath_trust` tables directly.
+
+The physical control-plane → Raven rename remains deferred until Day
+10E.9.

@@ -3,24 +3,21 @@ import {
 } from '@m2oath/auth-jwt'
 
 import {
-  StoredAgentIdentityResolver
-} from '@m2oath/agent'
-
-import {
-  checkMysqlPersistenceConnection,
-  createMysqlPersistencePool,
-  MysqlAgentIdentityBindingStore,
-  MysqlAgentIdentityStore,
-  MysqlAgentRegistrationProvenanceStore
-} from '@m2oath/persistence-mysql'
+  checkM2OathWebDatabaseConnection,
+  createM2OathWebDatabasePool
+} from './database.js'
 
 import {
   M2OathAgentDirectory
 } from './agent-store.js'
 
 import {
-  createDurableM2OathHostedComposition
-} from './m2oath-durable-composition.js'
+  FetchM2OathTransport,
+  M2OathSdk,
+  RemoteAgentIdentityDirectory,
+  RemoteM2OathAgentRegistrationRecoveryClient,
+  RemoteM2OathLifecycleClient
+} from '@m2oath/sdk'
 
 import {
   M2OathAgentRegistrationGateway
@@ -45,10 +42,6 @@ import {
 import {
   DeveloperAccountService
 } from './developer/developer-account-service.js'
-
-import {
-  DeveloperAccountAgentLifecycleAuthorizationPolicy
-} from './developer/developer-account-agent-lifecycle-authorization-policy.js'
 
 import {
   DeveloperAccountGateway
@@ -83,6 +76,16 @@ const developerJwtAudience =
 const developerJwtJwksUri =
   requireEnvironmentVariable(
     'M2OATH_DEVELOPER_JWT_JWKS_URI'
+  )
+
+const trustServiceBaseUrl =
+  requireEnvironmentVariable(
+    'M2OATH_TRUST_SERVICE_BASE_URL'
+  )
+
+const trustServiceAuthorization =
+  requireEnvironmentVariable(
+    'M2OATH_TRUST_SERVICE_AUTHORIZATION'
   )
 
 const mysqlHost =
@@ -129,7 +132,7 @@ const authenticationProvider =
   })
 
 const pool =
-  createMysqlPersistencePool({
+  createM2OathWebDatabasePool({
     host: mysqlHost,
     port: mysqlPort,
     database: mysqlDatabase,
@@ -137,7 +140,7 @@ const pool =
     password: mysqlPassword
   })
 
-await checkMysqlPersistenceConnection(
+await checkM2OathWebDatabaseConnection(
   pool
 )
 
@@ -151,21 +154,34 @@ const developerAccountService =
     developerAccountStore
   )
 
-const lifecycleAuthorizationPolicy =
-  new DeveloperAccountAgentLifecycleAuthorizationPolicy(
-    developerAccountService
+const trustTransport =
+  new FetchM2OathTransport({
+    baseUrl:
+      trustServiceBaseUrl,
+
+    getAuthorizationHeader:
+      () =>
+        trustServiceAuthorization
+  })
+
+const lifecycleClient =
+  new RemoteM2OathLifecycleClient(
+    trustTransport
   )
 
-const m2oath =
-  createDurableM2OathHostedComposition({
-    authenticationProvider,
-    lifecycleAuthorizationPolicy,
-    pool
+const m2oathSdk =
+  new M2OathSdk({
+    lifecycleClient
   })
+
+const agentIdentityDirectory =
+  new RemoteAgentIdentityDirectory(
+    trustTransport
+  )
 
 const directory =
   new M2OathAgentDirectory(
-    m2oath.identityDirectory
+    agentIdentityDirectory
   )
 
 const developerAccountGateway =
@@ -187,37 +203,19 @@ const developerAgentRelationshipService =
 
 const registrationGateway =
   new M2OathAgentRegistrationGateway({
-    sdk: m2oath.sdk
+    sdk: m2oathSdk
   })
 
-const agentIdentityBindingStore =
-  new MysqlAgentIdentityBindingStore(
-    pool
-  )
-
-const agentIdentityStore =
-  new MysqlAgentIdentityStore(
-    pool
-  )
-
-const registrationProvenanceStore =
-  new MysqlAgentRegistrationProvenanceStore(
-    pool
-  )
-
-const agentIdentityResolver =
-  new StoredAgentIdentityResolver(
-    agentIdentityBindingStore,
-    agentIdentityStore
+const registrationRecoveryClient =
+  new RemoteM2OathAgentRegistrationRecoveryClient(
+    trustTransport
   )
 
 const registrationRecoveryGateway =
   new M2OathAgentRegistrationRecoveryGateway({
     authenticationProvider,
-    identityResolver:
-      agentIdentityResolver,
-    provenanceStore:
-      registrationProvenanceStore
+    recoveryClient:
+      registrationRecoveryClient
   })
 
 const hostedRegistrationService =

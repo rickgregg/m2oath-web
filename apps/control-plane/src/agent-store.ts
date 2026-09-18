@@ -6,13 +6,14 @@ import type {
 import type {
   AgentIdentity,
   AgentIdentityDirectory,
-  AuthenticationRequest
+  AuthenticationRequest,
+  ExternalIdentityAssertion
 } from '@m2oath/agent'
 
 export interface AgentRegistrationGateway {
   registerAgent(
     request: RegisterAgentRequest,
-    authentication: AuthenticationRequest
+    principal: ExternalIdentityAssertion
   ): Promise<AgentSummary>
 }
 

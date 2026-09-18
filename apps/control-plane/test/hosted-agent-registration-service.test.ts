@@ -10,7 +10,8 @@ import type {
 } from '@m2oath/control-plane-client'
 
 import type {
-  AuthenticationRequest
+  AuthenticationRequest,
+  ExternalIdentityAssertion
 } from '@m2oath/agent'
 
 import {
@@ -23,6 +24,17 @@ describe(
     const authentication:
       AuthenticationRequest = {
         credential: 'developer-jwt'
+      }
+
+    const principal:
+      ExternalIdentityAssertion = {
+        type: 'oauth-subject',
+        subject: 'developer-123',
+        issuer: 'https://issuer.example',
+        authenticatedAt:
+          new Date(
+            '2026-09-08T21:00:00Z'
+          )
       }
 
     const request = {
@@ -47,14 +59,15 @@ describe(
         const callOrder: string[] = []
 
         const developerAccountGateway = {
-          resolveAuthenticated:
+          resolveAuthenticatedContext:
             vi.fn(async () => {
               callOrder.push(
                 'developer'
               )
 
               return {
-                developerId:
+                account: {
+                  developerId:
                   'dev_123',
 
                 status:
@@ -68,10 +81,12 @@ describe(
                     '2026-09-08T21:00:00Z'
                   ),
 
-                updatedAt:
-                  new Date(
-                    '2026-09-08T21:00:00Z'
-                  )
+                  updatedAt:
+                    new Date(
+                      '2026-09-08T21:00:00Z'
+                    )
+                },
+                principal
               }
             })
         }
@@ -154,7 +169,7 @@ describe(
 
         expect(
           developerAccountGateway
-            .resolveAuthenticated
+            .resolveAuthenticatedContext
         ).toHaveBeenCalledWith(
           authentication
         )
@@ -164,7 +179,7 @@ describe(
             .registerAgent
         ).toHaveBeenCalledWith(
           request,
-          authentication
+          principal
         )
 
         expect(
@@ -181,26 +196,30 @@ describe(
       'recovers an existing canonical Agent and assigns ownership without registering again',
       async () => {
         const developerAccountGateway = {
-          resolveAuthenticated:
+          resolveAuthenticatedContext:
             vi.fn(async () => ({
-              developerId:
-                'dev_123',
+              account: {
+                developerId:
+                  'dev_123',
 
-              status:
-                'active',
+                status:
+                  'active',
 
-              role:
-                'developer',
+                role:
+                  'developer',
 
-              createdAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                ),
+                createdAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  ),
 
-              updatedAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                )
+                updatedAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  )
+              },
+
+              principal
             }))
         }
 
@@ -304,26 +323,30 @@ describe(
       'recovers an Agent after registration fails and then assigns ownership',
       async () => {
         const developerAccountGateway = {
-          resolveAuthenticated:
+          resolveAuthenticatedContext:
             vi.fn(async () => ({
-              developerId:
-                'dev_123',
+              account: {
+                developerId:
+                  'dev_123',
 
-              status:
-                'active',
+                status:
+                  'active',
 
-              role:
-                'developer',
+                role:
+                  'developer',
 
-              createdAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                ),
+                createdAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  ),
 
-              updatedAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                )
+                updatedAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  )
+              },
+
+              principal
             }))
         }
 
@@ -426,26 +449,30 @@ describe(
       'preserves the original registration failure when safe recovery is unavailable',
       async () => {
         const developerAccountGateway = {
-          resolveAuthenticated:
+          resolveAuthenticatedContext:
             vi.fn(async () => ({
-              developerId:
-                'dev_123',
+              account: {
+                developerId:
+                  'dev_123',
 
-              status:
-                'active',
+                status:
+                  'active',
 
-              role:
-                'developer',
+                role:
+                  'developer',
 
-              createdAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                ),
+                createdAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  ),
 
-              updatedAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                )
+                updatedAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  )
+              },
+
+              principal
             }))
         }
 
@@ -509,7 +536,7 @@ describe(
       'does not register an Agent when Developer resolution fails',
       async () => {
         const developerAccountGateway = {
-          resolveAuthenticated:
+          resolveAuthenticatedContext:
             vi.fn(async () => {
               throw new Error(
                 'developer-account-not-found'
@@ -563,26 +590,30 @@ describe(
       'does not assign ownership when Agent registration fails',
       async () => {
         const developerAccountGateway = {
-          resolveAuthenticated:
+          resolveAuthenticatedContext:
             vi.fn(async () => ({
-              developerId:
-                'dev_123',
+              account: {
+                developerId:
+                  'dev_123',
 
-              status:
-                'active',
+                status:
+                  'active',
 
-              role:
-                'developer',
+                role:
+                  'developer',
 
-              createdAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                ),
+                createdAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  ),
 
-              updatedAt:
-                new Date(
-                  '2026-09-08T21:00:00Z'
-                )
+                updatedAt:
+                  new Date(
+                    '2026-09-08T21:00:00Z'
+                  )
+              },
+
+              principal
             }))
         }
 

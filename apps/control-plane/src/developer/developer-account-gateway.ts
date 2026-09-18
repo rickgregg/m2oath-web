@@ -1,6 +1,7 @@
 import type {
   AuthenticationProvider,
-  AuthenticationRequest
+  AuthenticationRequest,
+  ExternalIdentityAssertion
 } from '@m2oath/agent'
 
 import type {
@@ -18,6 +19,11 @@ import {
 export interface BootstrapDeveloperAccountRequest {
   authentication: AuthenticationRequest
   displayName?: string
+}
+
+export interface AuthenticatedDeveloperContext {
+  account: DeveloperAccount
+  principal: ExternalIdentityAssertion
 }
 
 /**
@@ -101,9 +107,9 @@ export class DeveloperAccountGateway {
    * Ordinary API access must resolve an existing Developer account and
    * must never create one as a side effect of authorization.
    */
-  async resolveAuthenticated(
+  async resolveAuthenticatedContext(
     authentication: AuthenticationRequest
-  ): Promise<DeveloperAccount> {
+  ): Promise<AuthenticatedDeveloperContext> {
     const identity =
       await this.authenticateIdentity(
         authentication
@@ -129,7 +135,22 @@ export class DeveloperAccountGateway {
       )
     }
 
-    return account
+    return {
+      account,
+      principal:
+        identity.assertion
+    }
+  }
+
+  async resolveAuthenticated(
+    authentication: AuthenticationRequest
+  ): Promise<DeveloperAccount> {
+    const context =
+      await this.resolveAuthenticatedContext(
+        authentication
+      )
+
+    return context.account
   }
 
   private async authenticateIdentity(
@@ -137,6 +158,7 @@ export class DeveloperAccountGateway {
   ): Promise<{
     issuer: string
     subject: string
+    assertion: ExternalIdentityAssertion
   }> {
     const result =
       await this.authenticationProvider.authenticate(
@@ -165,7 +187,9 @@ export class DeveloperAccountGateway {
 
     return {
       issuer,
-      subject
+      subject,
+      assertion:
+        result.assertion
     }
   }
 }

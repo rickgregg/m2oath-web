@@ -1,153 +1,85 @@
-import {
-  AgentCryptographicBindingRotationService,
-  AgentEnrollmentService,
-  AgentIdentityLifecycleService,
-  type AgentIdentityDirectory,
-  AgentRegistrationService,
-  AuthorizedAgentCryptographicBindingRotationService,
-  AuthorizedAgentDisableService,
-  AuthorizedAgentEnrollmentService,
-  ConfiguredAgentLifecycleAuthorizationPolicy,
-  type AuthenticationProvider
+import type {
+  AgentIdentity,
+  AgentIdentityDirectory,
+  AgentIdentityReader,
+  AuthenticationProvider,
+  ExternalIdentityAssertion
 } from '@m2oath/agent'
-
-import {
-  InMemoryAgentCryptographicBindingStore,
-  InMemoryAgentIdentityBindingStore,
-  InMemoryAgentIdentityStore,
-  InMemoryAgentRegistrationProvenanceStore,
-  UuidAgentIdGenerator
-} from '@m2oath/persistence'
 
 import {
   M2OathSdk
 } from '@m2oath/sdk'
 
-export interface M2OathHostedDeveloperPrincipal {
-  type: string
-  subject: string
-  issuer?: string
-}
-
-export interface CreateM2OathHostedCompositionOptions {
-  /**
-   * Authentication authority for hosted lifecycle operations.
-   *
-   * Production will supply @m2oath/auth-jwt here.
-   */
-  authenticationProvider: AuthenticationProvider
-
-  /**
-   * Exact authenticated Developer principals authorized by M2Oath.
-   *
-   * JWT scopes are intentionally not used as lifecycle authority.
-   */
-  developerPrincipals: M2OathHostedDeveloperPrincipal[]
-}
+import {
+  TestM2OathLifecycleClient
+} from './testing/test-m2oath-lifecycle-client.js'
 
 export interface M2OathHostedComposition {
   sdk: M2OathSdk
   identityDirectory: AgentIdentityDirectory
 }
 
+export interface M2OathHostedCompositionOptions {
+  authenticationProvider?:
+    AuthenticationProvider
+
+  developerPrincipals?: ReadonlyArray<
+    Pick<
+      ExternalIdentityAssertion,
+      'type' | 'subject' | 'issuer'
+    >
+  >
+}
+
+class TestAgentIdentityDirectory
+  implements AgentIdentityDirectory, AgentIdentityReader
+{
+  constructor(
+    private readonly lifecycleClient:
+      TestM2OathLifecycleClient
+  ) {}
+
+  async findById(
+    agentId: string
+  ): Promise<AgentIdentity | undefined> {
+    return this.lifecycleClient.findById(
+      agentId
+    )
+  }
+
+  async list(): Promise<AgentIdentity[]> {
+    return this.lifecycleClient.list()
+  }
+}
+
+/**
+ * Test-only hosted composition.
+ *
+ * Raven no longer composes the authoritative M2Oath Trust
+ * implementation in-process. Production lifecycle operations cross
+ * the M2Oath Trust service boundary through M2OathLifecycleClient.
+ *
+ * This composition provides deterministic in-memory collaborators
+ * that emulate the remote Trust authentication/lifecycle boundary
+ * for Raven tests without restoring an in-process Trust dependency.
+ */
 export function createM2OathHostedComposition(
-  options: CreateM2OathHostedCompositionOptions
+  options:
+    M2OathHostedCompositionOptions = {}
 ): M2OathHostedComposition {
-  const identityStore =
-    new InMemoryAgentIdentityStore()
-
-  const identityBindingStore =
-    new InMemoryAgentIdentityBindingStore()
-
-  const cryptographicBindingStore =
-    new InMemoryAgentCryptographicBindingStore()
-
-  const provenanceStore =
-    new InMemoryAgentRegistrationProvenanceStore()
-
-  const idGenerator =
-    new UuidAgentIdGenerator()
-
-  const registrationService =
-    new AgentRegistrationService(
-      idGenerator,
-      identityStore
+  const lifecycleClient =
+    new TestM2OathLifecycleClient(
+      options
     )
-
-  const enrollmentService =
-    new AgentEnrollmentService(
-      registrationService,
-      identityBindingStore,
-      () => new Date(),
-      cryptographicBindingStore
-    )
-
-  const lifecycleAuthorizationPolicy =
-    new ConfiguredAgentLifecycleAuthorizationPolicy({
-      grants:
-        options.developerPrincipals.map(
-          principal => ({
-            principal: {
-              ...principal
-            },
-            actions: [
-              'agent.create',
-              'agent.rotate-key',
-              'agent.disable'
-            ]
-          })
-        )
-    })
-
-  const authorizedEnrollmentService =
-    new AuthorizedAgentEnrollmentService(
-      options.authenticationProvider,
-      lifecycleAuthorizationPolicy,
-      enrollmentService,
-      undefined,
-      () => new Date(),
-      provenanceStore
-    )
-
-  const rotationService =
-    new AgentCryptographicBindingRotationService(
-      cryptographicBindingStore
-    )
-
-  const authorizedRotationService =
-    new AuthorizedAgentCryptographicBindingRotationService(
-      options.authenticationProvider,
-      lifecycleAuthorizationPolicy,
-      rotationService
-    )
-
-  const lifecycleService =
-    new AgentIdentityLifecycleService(
-      identityStore
-    )
-
-  const authorizedDisableService =
-    new AuthorizedAgentDisableService(
-      options.authenticationProvider,
-      lifecycleAuthorizationPolicy,
-      lifecycleService
-    )
-
-  const sdk =
-    new M2OathSdk({
-      enrollmentService:
-        authorizedEnrollmentService,
-
-      rotationService:
-        authorizedRotationService,
-
-      disableService:
-        authorizedDisableService
-    })
 
   return {
-    sdk,
+    sdk: new M2OathSdk({
+      lifecycleClient
+    }),
+
     identityDirectory:
-      identityStore
+      new TestAgentIdentityDirectory(
+        lifecycleClient
+      )
   }
 }

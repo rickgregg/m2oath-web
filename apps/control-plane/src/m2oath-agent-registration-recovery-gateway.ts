@@ -4,12 +4,13 @@ import type {
 } from '@m2oath/control-plane-client'
 
 import type {
-  AgentIdentityResolver,
-  AgentRegistrationProvenanceStore,
   AuthenticationProvider,
-  AuthenticationRequest,
-  ExternalIdentityAssertion
+  AuthenticationRequest
 } from '@m2oath/agent'
+
+import type {
+  M2OathAgentRegistrationRecoveryClient
+} from '@m2oath/sdk'
 
 import type {
   AgentRegistrationRecoveryGateway
@@ -19,36 +20,26 @@ export interface M2OathAgentRegistrationRecoveryGatewayOptions {
   authenticationProvider:
     AuthenticationProvider
 
-  identityResolver:
-    AgentIdentityResolver
-
-  provenanceStore:
-    AgentRegistrationProvenanceStore
-
-  now?: () => Date
+  recoveryClient:
+    M2OathAgentRegistrationRecoveryClient
 }
 
 /**
- * Recovers a previously registered canonical Agent when authoritative
- * M2Oath identity and registration provenance prove that the currently
- * authenticated principal originally registered that Agent.
+ * Raven adapter for authoritative M2Oath Agent registration recovery.
  *
- * This adapter does not create Agent identities, mutate registration
- * provenance, or grant Developer ownership. It only answers whether an
- * existing canonical Agent is safe to recover for this registration
- * attempt.
+ * Raven authenticates the human caller and forwards the established
+ * principal plus requested external Agent identifier to M2Oath Trust.
+ *
+ * M2Oath Trust remains authoritative for canonical Agent identity,
+ * registration provenance, and whether recovery is permitted.
  */
 export class M2OathAgentRegistrationRecoveryGateway
-  implements AgentRegistrationRecoveryGateway {
-  private readonly now: () => Date
-
+  implements AgentRegistrationRecoveryGateway
+{
   constructor(
     private readonly options:
       M2OathAgentRegistrationRecoveryGatewayOptions
-  ) {
-    this.now =
-      options.now ?? (() => new Date())
-  }
+  ) {}
 
   async findRecoverableAgent(
     request: RegisterAgentRequest,
@@ -65,104 +56,43 @@ export class M2OathAgentRegistrationRecoveryGateway
       return undefined
     }
 
-    const identifierAssertion:
-      ExternalIdentityAssertion = {
-        type:
-          request.identifier.type,
-
-        subject:
-          request.identifier.value,
-
-        ...(request.identifier.issuer
-          ? {
-              issuer:
-                request.identifier.issuer
-            }
-          : {}),
-
-        authenticatedAt:
-          this.now()
-      }
-
-    const resolution =
+    const identity =
       await this.options
-        .identityResolver
-        .resolve(
-          identifierAssertion
-        )
+        .recoveryClient
+        .findRecoverableAgent({
+          identifier: {
+            type:
+              request.identifier.type,
 
-    if (!resolution.resolved) {
-      return undefined
-    }
+            value:
+              request.identifier.value,
 
-    const provenance =
-      await this.options
-        .provenanceStore
-        .findByAgentId(
-          resolution.identity.id
-        )
+            ...(request.identifier.issuer
+              ? {
+                  issuer:
+                    request.identifier.issuer
+                }
+              : {})
+          },
 
-    if (!provenance) {
-      return undefined
-    }
+          principal:
+            authenticationResult.assertion
+        })
 
-    if (
-      !samePrincipal(
-        authenticationResult.assertion,
-        provenance.createdBy
-      )
-    ) {
+    if (!identity) {
       return undefined
     }
 
     return {
-      agentId:
-        resolution.identity.id,
+      agentId: identity.id,
+      status: identity.status,
 
-      status:
-        resolution.identity.status,
-
-      ...(resolution.identity.displayName
+      ...(identity.displayName
         ? {
             displayName:
-              resolution.identity.displayName
+              identity.displayName
           }
         : {})
     }
   }
-}
-
-function samePrincipal(
-  authenticated:
-    ExternalIdentityAssertion,
-
-  registeredBy: {
-    type: string
-    subject: string
-    issuer?: string
-  }
-): boolean {
-  return (
-    authenticated.type.trim() ===
-      registeredBy.type.trim() &&
-    authenticated.subject.trim() ===
-      registeredBy.subject.trim() &&
-    normalizeIssuer(
-      authenticated.issuer
-    ) ===
-      normalizeIssuer(
-        registeredBy.issuer
-      )
-  )
-}
-
-function normalizeIssuer(
-  issuer: string | undefined
-): string | undefined {
-  const normalized =
-    issuer?.trim()
-
-  return normalized
-    ? normalized
-    : undefined
 }

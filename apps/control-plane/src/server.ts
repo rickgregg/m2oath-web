@@ -380,21 +380,38 @@ async function handleRequest(
       await readJsonBody<RegisterAgentRequest>(request)
 
     try {
+      if (!options.hostedRegistrationService) {
+        sendJson(response, 503, {
+          error:
+            'hosted-agent-registration-unavailable'
+        })
+        return
+      }
+
       const agent =
-        options.hostedRegistrationService
-          ? await options.hostedRegistrationService.registerAgent(
-              body,
-              authentication
-            )
-          : await options.registrationGateway.registerAgent(
-              body,
-              authentication
-            )
+        await options.hostedRegistrationService.registerAgent(
+          body,
+          authentication
+        )
 
       sendJson(response, 201, {
         agent
       })
     } catch (error) {
+      if (
+        error instanceof DeveloperSessionError
+      ) {
+        if (
+          error.stage === 'authentication' ||
+          error.stage === 'identity'
+        ) {
+          sendJson(response, 401, {
+            error: error.message
+          })
+          return
+        }
+      }
+
       if (
         error instanceof AgentRegistrationError
       ) {

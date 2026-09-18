@@ -79,6 +79,21 @@ describe('Developer JWT registration integration', () => {
         sdk: m2oath.sdk
       })
 
+    const authenticationResult =
+      await authenticationProvider.authenticate({
+        credential: token
+      })
+
+    expect(
+      authenticationResult.authenticated
+    ).toBe(true)
+
+    if (!authenticationResult.authenticated) {
+      throw new Error(
+        'Expected Developer JWT authentication to succeed.'
+      )
+    }
+
     const agent =
       await gateway.registerAgent(
         {
@@ -89,9 +104,7 @@ describe('Developer JWT registration integration', () => {
             issuer: 'https://runtime.example'
           }
         },
-        {
-          credential: token
-        }
+        authenticationResult.assertion
       )
 
     expect(agent).toEqual({
@@ -149,19 +162,13 @@ describe('Developer JWT registration integration', () => {
         sdk: m2oath.sdk
       })
 
-    await expect(
-      gateway.registerAgent(
-        {
-          displayName: 'Rejected Agent',
-          identifier: {
-            type: 'runtime-jwt',
-            value: 'rejected-runtime'
-          }
-        },
-        {
-          credential: invalidToken
-        }
-      )
-    ).rejects.toThrow()
+    const authenticationResult =
+      await authenticationProvider.authenticate({
+        credential: invalidToken
+      })
+
+    expect(
+      authenticationResult.authenticated
+    ).toBe(false)
   })
 })

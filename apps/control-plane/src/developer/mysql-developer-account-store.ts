@@ -1,6 +1,6 @@
 import type {
   Pool
-} from '@m2oath/persistence-mysql'
+} from '../database.js'
 
 import type {
   DeveloperAccount,

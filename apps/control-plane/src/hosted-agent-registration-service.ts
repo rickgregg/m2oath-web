@@ -62,12 +62,15 @@ export class HostedAgentRegistrationService {
     request: RegisterAgentRequest,
     authentication: AuthenticationRequest
   ): Promise<AgentSummary> {
-    const developer =
+    const authenticatedDeveloper =
       await this.options
         .developerAccountGateway
-        .resolveAuthenticated(
+        .resolveAuthenticatedContext(
           authentication
         )
+
+    const developer =
+      authenticatedDeveloper.account
 
     const recoveredBeforeRegistration =
       await this.tryRecover(
@@ -92,7 +95,7 @@ export class HostedAgentRegistrationService {
           .registrationGateway
           .registerAgent(
             request,
-            authentication
+            authenticatedDeveloper.principal
           )
     } catch (error) {
       const recoveredAfterFailure =
