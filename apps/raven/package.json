@@ -1,5 +1,5 @@
 {
-  "name": "@m2oath/control-plane",
+  "name": "@m2oath/raven",
   "version": "0.1.0",
   "private": true,
   "type": "module",

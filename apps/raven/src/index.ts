@@ -20,6 +20,12 @@ import {
 } from '@m2oath/sdk'
 
 import {
+  RavenProviderFactory,
+  RavenProviderRegistry,
+  RavenProviderRuntime
+} from './providers/index.js'
+
+import {
   M2OathAgentRegistrationGateway
 } from './m2oath-agent-registration-gateway.js'
 
@@ -60,7 +66,7 @@ import {
 } from './developer/mysql-developer-agent-relationship-store.js'
 
 const port = Number(
-  process.env.M2OATH_CONTROL_PLANE_PORT ?? 4000
+  process.env.M2OATH_RAVEN_PORT ?? 4000
 )
 
 const developerJwtIssuer =
@@ -164,6 +170,43 @@ const trustTransport =
         trustServiceAuthorization
   })
 
+const providerRegistry =
+  new RavenProviderRegistry()
+
+providerRegistry.register({
+  providerId: 'm2oath-trust',
+  providerType: 'trust',
+  endpoint: trustServiceBaseUrl
+})
+
+const providerFactory =
+  new RavenProviderFactory({
+    getAuthorizationHeader:
+      descriptor => {
+        if (
+          descriptor.providerId !==
+          'm2oath-trust'
+        ) {
+          throw new Error(
+            `No Raven service credential configured for provider: ${descriptor.providerId}`
+          )
+        }
+
+        return trustServiceAuthorization
+      }
+  })
+
+const providerRuntime =
+  new RavenProviderRuntime(
+    providerRegistry,
+    providerFactory
+  )
+
+const trustStateProvider =
+  providerRuntime.getTrustProvider(
+    'm2oath-trust'
+  )
+
 const lifecycleClient =
   new RemoteM2OathLifecycleClient(
     trustTransport
@@ -246,7 +289,7 @@ const server =
 
 server.listen(port, () => {
   console.log(
-    `M2Oath control plane listening on port ${port}`
+    `M2Oath Raven listening on port ${port}`
   )
 })
 

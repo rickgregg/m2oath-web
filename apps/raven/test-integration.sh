@@ -26,7 +26,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "============================================================"
-echo "@m2oath/control-plane hosted integration harness"
+echo "@m2oath/raven hosted integration harness"
 echo "============================================================"
 echo
 
@@ -77,7 +77,7 @@ while true; do
 done
 
 echo
-echo "[test] Running hosted control-plane integration tests..."
+echo "[test] Running Raven integration tests..."
 
 cd "$CONTROL_PLANE_DIR"
 
@@ -85,7 +85,7 @@ pnpm test:integration:vitest
 
 echo
 echo "============================================================"
-echo "@m2oath/control-plane hosted integration test PASSED"
+echo "@m2oath/raven integration test PASSED"
 echo "============================================================"
 echo
 echo "Proven:"

@@ -241,40 +241,6 @@ importers:
         specifier: ^3.3.11
         version: 3.3.11(typescript@6.0.3)
 
-  apps/control-plane:
-    dependencies:
-      '@m2oath/agent':
-        specifier: file:../../../m2oath-agent/packages/agent
-        version: file:../m2oath-agent/packages/agent
-      '@m2oath/auth-jwt':
-        specifier: file:../../../m2oath-agent/packages/auth-jwt
-        version: file:../m2oath-agent/packages/auth-jwt(@m2oath/agent@file:../m2oath-agent/packages/agent)
-      '@m2oath/control-plane-client':
-        specifier: workspace:*
-        version: link:../../packages/control-plane-client
-      '@m2oath/persistence':
-        specifier: file:../../../m2oath-agent/packages/persistence
-        version: file:../m2oath-agent/packages/persistence(@m2oath/agent@file:../m2oath-agent/packages/agent)
-      '@m2oath/sdk':
-        specifier: file:../../../m2oath-agent/packages/sdk
-        version: file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)
-      mysql2:
-        specifier: ^3.14.5
-        version: 3.24.3(@types/node@26.4.1)
-    devDependencies:
-      '@types/node':
-        specifier: ^26.4.1
-        version: 26.4.1
-      jose:
-        specifier: ^6.2.11
-        version: 6.2.12
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^4.1.11
-        version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.0))
-
   apps/developer:
     dependencies:
       '@iconify-json/lucide':
@@ -320,6 +286,40 @@ importers:
       vitepress:
         specifier: ^1.6.4
         version: 1.6.4(@algolia/client-search@5.57.0)(@types/node@26.4.1)(change-case@5.4.4)(fuse.js@7.5.0)(lightningcss@1.33.0)(postcss@8.5.28)(search-insights@2.17.3)(terser@5.51.2)(typescript@7.0.2)
+
+  apps/raven:
+    dependencies:
+      '@m2oath/agent':
+        specifier: file:../../../m2oath-agent/packages/agent
+        version: file:../m2oath-agent/packages/agent
+      '@m2oath/auth-jwt':
+        specifier: file:../../../m2oath-agent/packages/auth-jwt
+        version: file:../m2oath-agent/packages/auth-jwt(@m2oath/agent@file:../m2oath-agent/packages/agent)
+      '@m2oath/control-plane-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-client
+      '@m2oath/persistence':
+        specifier: file:../../../m2oath-agent/packages/persistence
+        version: file:../m2oath-agent/packages/persistence(@m2oath/agent@file:../m2oath-agent/packages/agent)
+      '@m2oath/sdk':
+        specifier: file:../../../m2oath-agent/packages/sdk
+        version: file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)
+      mysql2:
+        specifier: ^3.14.5
+        version: 3.24.3(@types/node@26.4.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.4.1
+        version: 26.4.1
+      jose:
+        specifier: ^6.2.11
+        version: 6.2.12
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.0))
 
   apps/web:
     dependencies:
