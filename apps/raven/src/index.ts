@@ -94,6 +94,16 @@ const trustServiceAuthorization =
     'M2OATH_TRUST_SERVICE_AUTHORIZATION'
   )
 
+const weatherServiceBaseUrl =
+  requireEnvironmentVariable(
+    'M2OATH_WEATHER_SERVICE_BASE_URL'
+  )
+
+const weatherServiceAuthorization =
+  requireEnvironmentVariable(
+    'M2OATH_WEATHER_SERVICE_AUTHORIZATION'
+  )
+
 const mysqlHost =
   requireEnvironmentVariable(
     'M2OATH_MYSQL_HOST'
@@ -179,20 +189,29 @@ providerRegistry.register({
   endpoint: trustServiceBaseUrl
 })
 
+providerRegistry.register({
+  providerId: 'm2oath-weather',
+  providerType: 'trusted-domain',
+  endpoint: weatherServiceBaseUrl,
+  domain: 'weather'
+})
+
 const providerFactory =
   new RavenProviderFactory({
     getAuthorizationHeader:
       descriptor => {
-        if (
-          descriptor.providerId !==
-          'm2oath-trust'
-        ) {
-          throw new Error(
-            `No Raven service credential configured for provider: ${descriptor.providerId}`
-          )
-        }
+        switch (descriptor.providerId) {
+          case 'm2oath-trust':
+            return trustServiceAuthorization
 
-        return trustServiceAuthorization
+          case 'm2oath-weather':
+            return weatherServiceAuthorization
+
+          default:
+            throw new Error(
+              `No Raven service credential configured for provider: ${descriptor.providerId}`
+            )
+        }
       }
   })
 
