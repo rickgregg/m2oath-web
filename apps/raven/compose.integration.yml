@@ -1,0 +1,29 @@
+name: m2oath-raven-integration
+
+services:
+  mysql:
+    image: mysql:8.4
+
+    environment:
+      MYSQL_ROOT_PASSWORD: raven_integration_root_password
+      MYSQL_DATABASE: m2oath_web
+
+    ports:
+      - "33078:3306"
+
+    volumes:
+      - ../../migrations/mysql/001-create-authority-databases.sql:/docker-entrypoint-initdb.d/001-create-authority-databases.sql:ro
+      - ./migrations/000-integration-authority-users.sql:/docker-entrypoint-initdb.d/002-provision-authority-users.sql:ro
+      - ./migrations/001-create-developer-accounts.sql:/docker-entrypoint-initdb.d/101-create-developer-accounts.sql:ro
+      - ./migrations/002-create-developer-agent-relationships.sql:/docker-entrypoint-initdb.d/102-create-developer-agent-relationships.sql:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -praven_integration_root_password --silent"
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s

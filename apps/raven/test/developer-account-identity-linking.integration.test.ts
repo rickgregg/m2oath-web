@@ -7,11 +7,9 @@ import {
   it
 } from 'vitest'
 
-import {
-  checkMysqlPersistenceConnection,
-  createMysqlPersistencePool,
+import mysql, {
   type Pool
-} from '@m2oath/persistence-mysql'
+} from 'mysql2/promise'
 
 import {
   DeveloperAccountService
@@ -28,18 +26,16 @@ describe(
 
     beforeAll(async () => {
       pool =
-        createMysqlPersistencePool({
+        mysql.createPool({
           host: '127.0.0.1',
-          port: 33077,
-          database: 'm2oath_test',
-          user: 'm2oath_test',
+          port: 33078,
+          database: 'm2oath_web',
+          user: 'raven_web_user',
           password:
-            'm2oath_test_password'
+            'raven_web_test_password'
         })
 
-      await checkMysqlPersistenceConnection(
-        pool
-      )
+      await pool.query('SELECT 1')
     })
 
     beforeEach(async () => {

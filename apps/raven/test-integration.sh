@@ -2,17 +2,12 @@
 
 set -euo pipefail
 
-CONTROL_PLANE_DIR="$(
+RAVEN_DIR="$(
   cd "$(dirname "${BASH_SOURCE[0]}")" &&
   pwd
 )"
 
-PERSISTENCE_DIR="$(
-  cd "$CONTROL_PLANE_DIR/../../../m2oath-agent/packages/persistence-mysql" &&
-  pwd
-)"
-
-COMPOSE_FILE="$PERSISTENCE_DIR/compose.integration.yml"
+COMPOSE_FILE="$RAVEN_DIR/compose.integration.yml"
 MYSQL_SERVICE="mysql"
 MAX_WAIT_SECONDS=120
 WAIT_INTERVAL_SECONDS=2
@@ -30,7 +25,7 @@ echo "@m2oath/raven hosted integration harness"
 echo "============================================================"
 echo
 
-echo "[setup] Resetting persistence integration MySQL..."
+echo "[setup] Resetting Raven integration MySQL..."
 
 docker compose   -f "$COMPOSE_FILE"   down -v   >/dev/null 2>&1 || true
 
@@ -79,7 +74,7 @@ done
 echo
 echo "[test] Running Raven integration tests..."
 
-cd "$CONTROL_PLANE_DIR"
+cd "$RAVEN_DIR"
 
 pnpm test:integration:vitest
 
@@ -93,4 +88,8 @@ echo "  - hosted registration persists canonical Agent state in MySQL"
 echo "  - a fresh hosted composition reconstructs Agent detail"
 echo "  - a fresh hosted composition reconstructs the Agent list"
 echo "  - hosted Agent reads do not depend on process-local identity state"
+echo "  - raven_web_user can access m2oath_web and is denied Trust and Weather databases"
+echo "  - trust_user can access m2oath_trust and is denied Web and Weather databases"
+echo "  - weather_user can access m2oath_weather and is denied Web and Trust databases"
+echo "  - Raven integration MySQL is isolated from the live M2Oath Weather database"
 echo "============================================================"
