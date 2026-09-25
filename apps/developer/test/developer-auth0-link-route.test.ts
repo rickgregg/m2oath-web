@@ -46,6 +46,60 @@ describe(
     })
 
     it(
+      'starts Auth0 linking for an authenticated Developer without inspecting control-plane credential state',
+      async () => {
+        vi.stubGlobal(
+          'getUserSession',
+          vi.fn().mockResolvedValue({
+            user: {
+              subject:
+                'developer-subject',
+
+              developerId:
+                'dev-123'
+            },
+
+            secure: undefined
+          })
+        )
+
+        auth0LinkHandler
+          .mockResolvedValueOnce(
+            'auth0-link-started'
+          )
+
+        const {
+          default: handler
+        } = await import(
+          '../server/routes/auth/link.get'
+        )
+
+        const event = {}
+
+        const result
+          = await handler(event)
+
+        expect(
+          auth0LinkHandler
+        ).toHaveBeenCalledOnce()
+
+        expect(
+          auth0LinkHandler
+        ).toHaveBeenCalledWith(
+          event
+        )
+
+        expect(
+          globalThis.sendRedirect
+        ).not.toHaveBeenCalled()
+
+        expect(result).toBe(
+          'auth0-link-started'
+        )
+      }
+    )
+
+    it(
       'redirects to the home page without starting Auth0 when there is no Developer session',
       async () => {
         vi.stubGlobal(

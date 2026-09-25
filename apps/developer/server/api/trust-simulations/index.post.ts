@@ -3,9 +3,17 @@ import {
   HttpControlPlaneClient
 } from '@m2oath/control-plane-client'
 
+import type {
+  RunTrustPolicyWorkbenchSimulationRequest
+} from '@m2oath/control-plane-client'
+
 import {
   getValidControlPlaneAccessToken
 } from '../../auth/control-plane-credential'
+
+interface TrustSimulationBody {
+  scenarioId?: unknown
+}
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event)
@@ -23,21 +31,24 @@ export default defineEventHandler(async (event) => {
       event
     )
 
-  const agentId
-    = getRouterParam(event, 'agentId')?.trim()
+  const body =
+    await readBody<TrustSimulationBody>(event)
 
-  if (!agentId) {
+  if (
+    typeof body.scenarioId !== 'string'
+    || !body.scenarioId.trim()
+  ) {
     throw createError({
       statusCode: 400,
       statusMessage:
-        'Agent ID is required'
+        'Trust simulation scenario ID is required'
     })
   }
 
   const config = useRuntimeConfig(event)
 
-  const client
-    = new HttpControlPlaneClient({
+  const client =
+    new HttpControlPlaneClient({
       baseUrl:
         config.controlPlaneBaseUrl,
 
@@ -45,10 +56,25 @@ export default defineEventHandler(async (event) => {
         controlPlaneAccessToken
     })
 
+  const request = {
+    scenarioId:
+      body.scenarioId.trim()
+  } as RunTrustPolicyWorkbenchSimulationRequest
+
   try {
-    return await client.getMyAgent(agentId)
+    return await client.runTrustSimulation(
+      request
+    )
   } catch (error) {
     if (error instanceof ControlPlaneHttpError) {
+      if (error.status === 400) {
+        throw createError({
+          statusCode: 400,
+          statusMessage:
+            'Invalid trust simulation request'
+        })
+      }
+
       if (error.status === 401) {
         throw createError({
           statusCode: 401,
@@ -61,28 +87,28 @@ export default defineEventHandler(async (event) => {
         throw createError({
           statusCode: 403,
           statusMessage:
-            'Developer is not authorized to view this agent'
+            'Developer is not authorized to run trust simulations'
         })
       }
 
-      if (error.status === 404) {
+      if (error.status === 502) {
         throw createError({
-          statusCode: 404,
+          statusCode: 502,
           statusMessage:
-            'Agent not found'
+            'Trust simulation service failed'
         })
       }
     }
 
     console.error(
-      'Agent lookup failed',
+      'Trust simulation failed',
       error
     )
 
     throw createError({
       statusCode: 502,
       statusMessage:
-        'Control plane agent lookup failed'
+        'Control plane trust simulation failed'
     })
   }
 })

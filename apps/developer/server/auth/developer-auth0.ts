@@ -4,6 +4,10 @@ import {
 } from '@m2oath/control-plane-client'
 import type { H3Event } from 'h3'
 
+import {
+  getValidControlPlaneAccessToken
+} from './control-plane-credential'
+
 interface DeveloperAuth0User {
   sub: string
   email?: string
@@ -12,6 +16,9 @@ interface DeveloperAuth0User {
 
 interface DeveloperAuth0Tokens {
   access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  token_type?: string
 }
 
 interface DeveloperAuth0Result {
@@ -27,6 +34,7 @@ export const developerAuth0Config = {
 
   scope: [
     'openid',
+    'offline_access',
     'profile',
     'email',
     'agent:create'
@@ -94,7 +102,16 @@ export async function handleDeveloperAuth0Success(
 
     secure: {
       controlPlaneAccessToken:
-        tokens.access_token
+        tokens.access_token,
+
+      controlPlaneRefreshToken:
+        tokens.refresh_token,
+
+      controlPlaneAccessTokenExpiresAt:
+        typeof tokens.expires_in === 'number'
+          ? Date.now()
+            + tokens.expires_in * 1000
+          : undefined
     }
   })
 
@@ -140,17 +157,9 @@ export async function handleDeveloperAuth0LinkSuccess(
   }
 
   const controlPlaneAccessToken
-    = session.secure
-      ?.controlPlaneAccessToken
-      ?.trim()
-
-  if (!controlPlaneAccessToken) {
-    throw createError({
-      statusCode: 401,
-      statusMessage:
-        'Developer control-plane credential is unavailable'
-    })
-  }
+    = await getValidControlPlaneAccessToken(
+      event
+    )
 
   const externalIdentityCredential
     = tokens.access_token?.trim()

@@ -5,7 +5,9 @@ import type {
   LinkDeveloperExternalIdentityRequest,
   LinkDeveloperExternalIdentityResponse,
   RegisterAgentRequest,
-  RegisterAgentResponse
+  RegisterAgentResponse,
+  RunTrustPolicyWorkbenchSimulationRequest,
+  TrustPolicyWorkbenchResult
 } from './types.js'
 
 export interface ControlPlaneClient {
@@ -28,4 +30,8 @@ export interface ControlPlaneClient {
   getMyAgent(agentId: string): Promise<AgentSummary>
 
   listMyAgents(): Promise<AgentSummary[]>
+
+  runTrustSimulation(
+    request: RunTrustPolicyWorkbenchSimulationRequest
+  ): Promise<TrustPolicyWorkbenchResult>
 }

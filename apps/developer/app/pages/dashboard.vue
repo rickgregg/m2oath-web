@@ -124,6 +124,14 @@ async function signOut() {
               Register an Agent
             </UButton>
 
+            <UButton
+              to="/trust-workbench"
+              variant="outline"
+              icon="i-lucide-shield-check"
+            >
+              Trust Policy Workbench
+            </UButton>
+
             <a href="/auth/link">
               <UButton
                 variant="outline"

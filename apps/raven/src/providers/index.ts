@@ -26,3 +26,14 @@ export type {
 export {
   RavenProviderRuntime
 } from './raven-provider-runtime.js'
+
+export {
+  OAuthClientCredentialsServiceAuthorizationProvider,
+  StaticServiceAuthorizationProvider
+} from './service-authorization-provider.js'
+
+export type {
+  OAuthClientCredentialsServiceAuthorizationProviderOptions,
+  ServiceAuthorizationProvider,
+  StaticServiceAuthorizationProviderOptions
+} from './service-authorization-provider.js'

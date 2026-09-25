@@ -20,14 +20,24 @@ import {
 } from '@m2oath/sdk'
 
 import {
+  OAuthClientCredentialsServiceAuthorizationProvider,
   RavenProviderFactory,
   RavenProviderRegistry,
-  RavenProviderRuntime
+  RavenProviderRuntime,
+  StaticServiceAuthorizationProvider
 } from './providers/index.js'
 
 import {
   M2OathAgentRegistrationGateway
 } from './m2oath-agent-registration-gateway.js'
+
+import {
+  RemoteTrustPolicyWorkbenchSimulationClient
+} from '@m2oath/trust-simulation-client'
+
+import {
+  M2OathTrustSimulationGateway
+} from './m2oath-trust-simulation-gateway.js'
 
 import {
   M2OathAgentRegistrationRecoveryGateway
@@ -89,10 +99,38 @@ const trustServiceBaseUrl =
     'M2OATH_TRUST_SERVICE_BASE_URL'
   )
 
-const trustServiceAuthorization =
-  requireEnvironmentVariable(
-    'M2OATH_TRUST_SERVICE_AUTHORIZATION'
-  )
+const trustServiceOAuthTokenEndpoint =
+  process.env[
+    'M2OATH_TRUST_SERVICE_OAUTH_TOKEN_ENDPOINT'
+  ]?.trim()
+
+const trustServiceAuthorizationProvider =
+  trustServiceOAuthTokenEndpoint
+    ? new OAuthClientCredentialsServiceAuthorizationProvider({
+        tokenEndpoint:
+          trustServiceOAuthTokenEndpoint,
+
+        clientId:
+          requireEnvironmentVariable(
+            'M2OATH_TRUST_SERVICE_OAUTH_CLIENT_ID'
+          ),
+
+        clientSecret:
+          requireEnvironmentVariable(
+            'M2OATH_TRUST_SERVICE_OAUTH_CLIENT_SECRET'
+          ),
+
+        audience:
+          requireEnvironmentVariable(
+            'M2OATH_TRUST_SERVICE_OAUTH_AUDIENCE'
+          )
+      })
+    : new StaticServiceAuthorizationProvider({
+        authorizationHeader:
+          requireEnvironmentVariable(
+            'M2OATH_TRUST_SERVICE_AUTHORIZATION'
+          )
+      })
 
 const weatherServiceBaseUrl =
   requireEnvironmentVariable(
@@ -177,7 +215,20 @@ const trustTransport =
 
     getAuthorizationHeader:
       () =>
-        trustServiceAuthorization
+        trustServiceAuthorizationProvider
+          .getAuthorizationHeader()
+  })
+
+
+const trustSimulationClient =
+  new RemoteTrustPolicyWorkbenchSimulationClient(
+    trustTransport
+  )
+
+const trustSimulationGateway =
+  new M2OathTrustSimulationGateway({
+    client:
+      trustSimulationClient
   })
 
 const providerRegistry =
@@ -202,7 +253,8 @@ const providerFactory =
       descriptor => {
         switch (descriptor.providerId) {
           case 'm2oath-trust':
-            return trustServiceAuthorization
+            return trustServiceAuthorizationProvider
+              .getAuthorizationHeader()
 
           case 'm2oath-weather':
             return weatherServiceAuthorization
@@ -303,7 +355,8 @@ const server =
     directory,
     developerAccountGateway,
     hostedRegistrationService,
-    developerOwnedAgentService
+    developerOwnedAgentService,
+    trustSimulationGateway
   })
 
 server.listen(port, () => {

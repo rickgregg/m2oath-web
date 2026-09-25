@@ -9,6 +9,8 @@ declare module '#auth-utils' {
 
   interface SecureSessionData {
     controlPlaneAccessToken?: string
+    controlPlaneRefreshToken?: string
+    controlPlaneAccessTokenExpiresAt?: number
   }
 }
 

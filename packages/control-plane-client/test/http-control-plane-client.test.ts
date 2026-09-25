@@ -300,4 +300,78 @@ describe('HttpControlPlaneClient', () => {
     )
   })
 
+
+  it('runs a trust simulation through the authenticated Developer control-plane endpoint', async () => {
+    const result = {
+      scenario: {
+        id: 'normal-trust-growth',
+        name: 'Normal trust growth',
+        startedAt: '2026-09-21T12:00:00.000Z',
+        completedAt: '2026-09-21T12:05:00.000Z'
+      },
+      model: {
+        id: 'm2oath-trust',
+        version: '1'
+      },
+      timeline: []
+    }
+
+    const fetch = vi.fn(async () => new Response(
+      JSON.stringify(result),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    ))
+
+    const client = new HttpControlPlaneClient({
+      baseUrl: 'https://control.m2oath.example/',
+      bearerToken: 'developer-token',
+      fetch
+    })
+
+    const response =
+      await client.runTrustSimulation({
+        scenarioId: 'normal-trust-growth'
+      })
+
+    expect(response).toEqual(result)
+
+    expect(fetch).toHaveBeenCalledOnce()
+
+    const [url, init] =
+      fetch.mock.calls[0]!
+
+    expect(url).toBe(
+      'https://control.m2oath.example/v1/developers/me/trust-simulations'
+    )
+
+    expect(init?.method).toBe('POST')
+
+    const headers =
+      new Headers(init?.headers)
+
+    expect(
+      headers.get('content-type')
+    ).toBe('application/json')
+
+    expect(
+      headers.get('authorization')
+    ).toBe('Bearer developer-token')
+
+    expect(
+      JSON.parse(String(init?.body))
+    ).toEqual({
+      scenarioId: 'normal-trust-growth'
+    })
+
+    expect(
+      String(init?.body)
+    ).not.toContain(
+      'developer-token'
+    )
+  })
+
 })

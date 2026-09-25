@@ -304,6 +304,9 @@ importers:
       '@m2oath/sdk':
         specifier: file:../../../m2oath-agent/packages/sdk
         version: file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)
+      '@m2oath/trust-simulation-client':
+        specifier: file:../../../m2oath-trust/packages/trust-simulation-client
+        version: file:../m2oath-trust/packages/trust-simulation-client(@m2oath/agent@file:../m2oath-agent/packages/agent)(@m2oath/sdk@file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent))
       mysql2:
         specifier: ^3.14.5
         version: 3.24.3(@types/node@26.4.1)
@@ -1300,6 +1303,12 @@ packages:
     resolution: {directory: ../m2oath-agent/packages/sdk, type: directory}
     peerDependencies:
       '@m2oath/agent': ^0.1.0
+
+  '@m2oath/trust-simulation-client@file:../m2oath-trust/packages/trust-simulation-client':
+    resolution: {directory: ../m2oath-trust/packages/trust-simulation-client, type: directory}
+    peerDependencies:
+      '@m2oath/agent': ^0.1.0
+      '@m2oath/sdk': ^0.1.0
 
   '@mapbox/node-pre-gyp@2.0.3':
     resolution: {integrity: sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg==}
@@ -7137,6 +7146,11 @@ snapshots:
   '@m2oath/sdk@file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)':
     dependencies:
       '@m2oath/agent': file:../m2oath-agent/packages/agent
+
+  '@m2oath/trust-simulation-client@file:../m2oath-trust/packages/trust-simulation-client(@m2oath/agent@file:../m2oath-agent/packages/agent)(@m2oath/sdk@file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent))':
+    dependencies:
+      '@m2oath/agent': file:../m2oath-agent/packages/agent
+      '@m2oath/sdk': file:../m2oath-agent/packages/sdk(@m2oath/agent@file:../m2oath-agent/packages/agent)
 
   '@mapbox/node-pre-gyp@2.0.3(supports-color@10.2.2)':
     dependencies:

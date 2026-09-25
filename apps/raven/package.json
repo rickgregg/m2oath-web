@@ -18,7 +18,8 @@
     "@m2oath/control-plane-client": "workspace:*",
     "@m2oath/persistence": "file:../../../m2oath-agent/packages/persistence",
     "@m2oath/sdk": "file:../../../m2oath-agent/packages/sdk",
-    "mysql2": "^3.14.5"
+    "mysql2": "^3.14.5",
+    "@m2oath/trust-simulation-client": "file:../../../m2oath-trust/packages/trust-simulation-client"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

@@ -1,0 +1,38 @@
+name: m2oath-local
+
+services:
+  mysql:
+    image: mysql:8.4
+
+    environment:
+      MYSQL_ROOT_PASSWORD: m2oath_local_root_password
+
+    ports:
+      - "33079:3306"
+
+    volumes:
+      - m2oath-local-mysql:/var/lib/mysql
+
+      - ../../migrations/mysql/001-create-authority-databases.sql:/docker-entrypoint-initdb.d/001-create-authority-databases.sql:ro
+
+      - ./mysql/002-create-local-authority-users.sql:/docker-entrypoint-initdb.d/002-create-local-authority-users.sql:ro
+
+      - ../../apps/raven/migrations/001-create-developer-accounts.sql:/m2oath-migrations/web/001-create-developer-accounts.sql:ro
+
+      - ../../apps/raven/migrations/002-create-developer-agent-relationships.sql:/m2oath-migrations/web/002-create-developer-agent-relationships.sql:ro
+
+      - ./mysql/101-initialize-web-schema.sql:/docker-entrypoint-initdb.d/101-initialize-web-schema.sql:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -pm2oath_local_root_password --silent"
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  m2oath-local-mysql:

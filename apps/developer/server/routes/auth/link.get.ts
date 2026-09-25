@@ -29,9 +29,6 @@ export default defineEventHandler(async (event) => {
     = Boolean(
       session.user?.subject
       && session.user?.developerId
-      && session.secure
-        ?.controlPlaneAccessToken
-        ?.trim()
     )
 
   if (!hasDeveloperSession) {

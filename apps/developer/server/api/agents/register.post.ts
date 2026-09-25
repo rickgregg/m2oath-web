@@ -3,6 +3,10 @@ import {
   HttpControlPlaneClient
 } from '@m2oath/control-plane-client'
 
+import {
+  getValidControlPlaneAccessToken
+} from '../../auth/control-plane-credential'
+
 interface RegisterAgentBody {
   displayName?: string
 
@@ -80,15 +84,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const controlPlaneAccessToken
-    = session.secure?.controlPlaneAccessToken?.trim()
-
-  if (!controlPlaneAccessToken) {
-    throw createError({
-      statusCode: 401,
-      statusMessage:
-        'Developer control-plane credential is unavailable'
-    })
-  }
+    = await getValidControlPlaneAccessToken(
+      event
+    )
 
   const client
     = new HttpControlPlaneClient({

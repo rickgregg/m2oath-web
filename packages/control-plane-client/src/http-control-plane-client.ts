@@ -6,7 +6,9 @@ import type {
   LinkDeveloperExternalIdentityRequest,
   LinkDeveloperExternalIdentityResponse,
   RegisterAgentRequest,
-  RegisterAgentResponse
+  RegisterAgentResponse,
+  RunTrustPolicyWorkbenchSimulationRequest,
+  TrustPolicyWorkbenchResult
 } from './types.js'
 
 export interface HttpControlPlaneClientOptions {
@@ -104,6 +106,21 @@ export class HttpControlPlaneClient implements ControlPlaneClient {
   async listMyAgents(): Promise<AgentSummary[]> {
     return this.request<AgentSummary[]>(
       '/v1/developers/me/agents'
+    )
+  }
+
+  async runTrustSimulation(
+    request: RunTrustPolicyWorkbenchSimulationRequest
+  ): Promise<TrustPolicyWorkbenchResult> {
+    return this.request<TrustPolicyWorkbenchResult>(
+      '/v1/developers/me/trust-simulations',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      }
     )
   }
 

@@ -13,6 +13,14 @@ import {
   createControlPlaneServer
 } from '../src/server.js'
 
+import {
+  RemoteTrustPolicyWorkbenchSimulationError
+} from '@m2oath/trust-simulation-client'
+
+import type {
+  M2OathTrustSimulationGateway
+} from '../src/m2oath-trust-simulation-gateway.js'
+
 import type {
   AuthenticationProvider,
   AuthenticationRequest,
@@ -65,7 +73,10 @@ afterEach(async () => {
   )
 })
 
-async function startServer() {
+async function startServer(
+  trustSimulationGateway?:
+    M2OathTrustSimulationGateway
+) {
   const authenticationOptions =
     createTestM2OathAuthenticationOptions()
 
@@ -194,7 +205,8 @@ async function startServer() {
       registrationGateway,
       directory,
       developerAccountGateway,
-      hostedRegistrationService
+      hostedRegistrationService,
+      trustSimulationGateway
     })
 
   servers.push(server)
@@ -858,6 +870,266 @@ describe('M2Oath control-plane API', () => {
       ).toEqual({
         error:
           'developer-authentication-required'
+      })
+    }
+  )
+
+
+  it(
+    'runs a Trust simulation for an authenticated Developer',
+    async () => {
+      const result = {
+        scenario: {
+          id:
+            'normal-trust-growth',
+          name:
+            'Normal Trust Growth',
+          startedAt:
+            '2026-01-01T00:00:00.000Z',
+          completedAt:
+            '2026-01-01T00:30:00.000Z'
+        },
+
+        model: {
+          modelId:
+            'm2oath-workbench',
+          modelVersion:
+            '1',
+          configurationHash:
+            'canonical-day-10'
+        },
+
+        timeline: []
+      }
+
+      const requests: unknown[] = []
+
+      const trustSimulationGateway = {
+        run:
+          async (request: unknown) => {
+            requests.push(request)
+            return result
+          }
+      } as M2OathTrustSimulationGateway
+
+      const {
+        baseUrl
+      } =
+        await startServer(
+          trustSimulationGateway
+        )
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-simulations`,
+          {
+            method: 'POST',
+
+            headers: {
+              'content-type':
+                'application/json',
+
+              authorization:
+                `Bearer ${TEST_DEVELOPER_TOKEN}`
+            },
+
+            body:
+              JSON.stringify({
+                scenarioId:
+                  'normal-trust-growth'
+              })
+          }
+        )
+
+      expect(response.status).toBe(200)
+
+      expect(
+        await response.json()
+      ).toEqual(result)
+
+      expect(requests).toEqual([
+        {
+          scenarioId:
+            'normal-trust-growth'
+        }
+      ])
+    }
+  )
+
+  it(
+    'requires Developer authentication for Trust simulation',
+    async () => {
+      const trustSimulationGateway = {
+        run:
+          async () => {
+            throw new Error(
+              'Simulation gateway must not be called'
+            )
+          }
+      } as M2OathTrustSimulationGateway
+
+      const {
+        baseUrl
+      } =
+        await startServer(
+          trustSimulationGateway
+        )
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-simulations`,
+          {
+            method: 'POST',
+
+            headers: {
+              'content-type':
+                'application/json'
+            },
+
+            body:
+              JSON.stringify({
+                scenarioId:
+                  'normal-trust-growth'
+              })
+          }
+        )
+
+      expect(response.status).toBe(401)
+
+      expect(
+        await response.json()
+      ).toEqual({
+        error:
+          'developer-authentication-required'
+      })
+    }
+  )
+
+  it(
+    'reports Trust simulation unavailable when Raven has no simulation gateway',
+    async () => {
+      const {
+        baseUrl
+      } =
+        await startServer()
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-simulations`,
+          {
+            method: 'POST',
+
+            headers: {
+              'content-type':
+                'application/json',
+
+              authorization:
+                `Bearer ${TEST_DEVELOPER_TOKEN}`
+            },
+
+            body:
+              JSON.stringify({
+                scenarioId:
+                  'normal-trust-growth'
+              })
+          }
+        )
+
+      expect(response.status).toBe(503)
+
+      expect(
+        await response.json()
+      ).toEqual({
+        error:
+          'trust-simulation-service-unavailable'
+      })
+    }
+  )
+
+
+  it.each([
+    {
+      upstreamStatus: 400,
+      expectedStatus: 400,
+      expectedError:
+        'invalid-trust-simulation-request'
+    },
+    {
+      upstreamStatus: 403,
+      expectedStatus: 403,
+      expectedError:
+        'trust-simulation-not-authorized'
+    },
+    {
+      upstreamStatus: 401,
+      expectedStatus: 502,
+      expectedError:
+        'trust-simulation-service-authentication-failed'
+    },
+    {
+      upstreamStatus: 503,
+      expectedStatus: 502,
+      expectedError:
+        'trust-simulation-service-failed'
+    }
+  ])(
+    'translates authoritative Trust simulation failures: HTTP $upstreamStatus',
+    async ({
+      upstreamStatus,
+      expectedStatus,
+      expectedError
+    }) => {
+      const trustSimulationGateway = {
+        run:
+          async () => {
+            throw new RemoteTrustPolicyWorkbenchSimulationError(
+              upstreamStatus,
+              {
+                error:
+                  'authoritative-upstream-error'
+              }
+            )
+          }
+      } as M2OathTrustSimulationGateway
+
+      const {
+        baseUrl
+      } =
+        await startServer(
+          trustSimulationGateway
+        )
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-simulations`,
+          {
+            method: 'POST',
+
+            headers: {
+              'content-type':
+                'application/json',
+
+              authorization:
+                `Bearer ${TEST_DEVELOPER_TOKEN}`
+            },
+
+            body:
+              JSON.stringify({
+                scenarioId:
+                  'normal-trust-growth'
+              })
+          }
+        )
+
+      expect(response.status).toBe(
+        expectedStatus
+      )
+
+      expect(
+        await response.json()
+      ).toEqual({
+        error:
+          expectedError
       })
     }
   )

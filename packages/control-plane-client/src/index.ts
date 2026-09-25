@@ -8,7 +8,16 @@ export type {
   RegisterAgentIdentifier,
   RegisterAgentCryptographicMaterial,
   RegisterAgentRequest,
-  RegisterAgentResponse
+  RegisterAgentResponse,
+  TrustSimulationScenarioId,
+  RunTrustPolicyWorkbenchSimulationRequest,
+  TrustSimulationOperation,
+  TrustSimulationTrustState,
+  TrustSimulationEvidenceDiagnostic,
+  TrustSimulationPolicyDecision,
+  TrustPolicyWorkbenchSource,
+  TrustPolicyWorkbenchTimelinePoint,
+  TrustPolicyWorkbenchResult
 } from './types.js'
 
 export type {
