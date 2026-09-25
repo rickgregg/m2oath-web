@@ -1,15 +1,20 @@
 import {
-  RemoteTrustPolicyWorkbenchSimulationClient
+  RemoteTrustPolicyWorkbenchSimulationClient,
+  RemoteTrustPopulationWorkbenchSimulationClient
 } from '@m2oath/trust-simulation-client'
 
 import type {
   RunTrustPolicyWorkbenchSimulationRequest,
-  TrustPolicyWorkbenchResult
+  TrustPolicyWorkbenchResult,
+  TrustPopulationWorkbenchResult
 } from '@m2oath/trust-simulation-client'
 
 export interface M2OathTrustSimulationGatewayOptions {
   client:
     RemoteTrustPolicyWorkbenchSimulationClient
+
+  populationClient:
+    RemoteTrustPopulationWorkbenchSimulationClient
 }
 
 /**
@@ -37,5 +42,10 @@ export class M2OathTrustSimulationGateway {
       RunTrustPolicyWorkbenchSimulationRequest
   ): Promise<TrustPolicyWorkbenchResult> {
     return this.options.client.run(request)
+  }
+
+  async runPopulation():
+    Promise<TrustPopulationWorkbenchResult> {
+    return this.options.populationClient.run()
   }
 }

@@ -2,6 +2,7 @@
 import type {
   TrustPolicyWorkbenchModelConfigurationId,
   TrustPolicyWorkbenchResult,
+  TrustPopulationWorkbenchResult,
   TrustSimulationScenarioId
 } from '@m2oath/control-plane-client'
 
@@ -115,6 +116,24 @@ const scenarios: ScenarioOption[] = [
   }
 ]
 
+type WorkbenchMode =
+  | 'scenario'
+  | 'population'
+
+const workbenchMode =
+  ref<WorkbenchMode>('scenario')
+
+const workbenchModes = [
+  {
+    label: 'Scenario',
+    value: 'scenario'
+  },
+  {
+    label: 'Population',
+    value: 'population'
+  }
+]
+
 const selectedModelConfiguration =
   ref<TrustPolicyWorkbenchModelConfigurationId>(
     'farming-resistance-v1'
@@ -130,6 +149,11 @@ const running =
 
 const result =
   ref<TrustPolicyWorkbenchResult | null>(
+    null
+  )
+
+const populationResult =
+  ref<TrustPopulationWorkbenchResult | null>(
     null
   )
 
@@ -158,9 +182,73 @@ const selectedScenarioDescription =
       )?.description
   )
 
+const compositeTrustDistribution =
+  computed(() => {
+    if (!populationResult.value) {
+      return []
+    }
+
+    const counts =
+      new Map<number, number>()
+
+    for (
+      const agent
+      of populationResult.value.agents
+    ) {
+      counts.set(
+        agent.compositeTrustScore,
+        (counts.get(
+          agent.compositeTrustScore
+        ) ?? 0) + 1
+      )
+    }
+
+    const maximumCount =
+      Math.max(
+        1,
+        ...counts.values()
+      )
+
+    return [...counts.entries()]
+      .sort(
+        ([left], [right]) =>
+          left - right
+      )
+      .map(
+        ([score, count]) => ({
+          score,
+          count,
+          percentage:
+            (count / maximumCount) * 100
+        })
+      )
+  })
+
+async function runPopulationSimulation() {
+  running.value = true
+  populationResult.value = null
+  errorMessage.value = null
+
+  try {
+    populationResult.value =
+      await $fetch<TrustPopulationWorkbenchResult>(
+        '/api/trust-population-simulations',
+        {
+          method: 'POST'
+        }
+      )
+  } catch {
+    errorMessage.value =
+      'The trust population simulation could not be completed through the M2Oath control plane.'
+  } finally {
+    running.value = false
+  }
+}
+
 async function runSimulation() {
   running.value = true
   result.value = null
+  populationResult.value = null
   errorMessage.value = null
 
   try {
@@ -218,16 +306,32 @@ async function runSimulation() {
         <template #header>
           <div>
             <h2 class="text-xl font-semibold">
-              Scenario
+              Simulation
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              Select a trust behavior to simulate.
+              Inspect one deterministic scenario or the
+              authoritative Day 11 population baseline.
             </p>
           </div>
         </template>
 
         <div class="space-y-5">
+          <UFormField
+            label="Mode"
+            description="Choose a single trust scenario or a multi-Agent population simulation."
+          >
+            <USelect
+              v-model="workbenchMode"
+              class="w-full"
+              :items="workbenchModes"
+              label-key="label"
+              value-key="value"
+              :disabled="running"
+            />
+          </UFormField>
+
+          <template v-if="workbenchMode === 'scenario'">
           <UFormField
             label="Trust model"
             :description="selectedModelConfigurationDescription"
@@ -256,14 +360,34 @@ async function runSimulation() {
             />
           </UFormField>
 
-          <UButton
-            icon="i-lucide-play"
-            :loading="running"
-            :disabled="running"
-            @click="runSimulation"
-          >
-            Run Simulation
-          </UButton>
+            <UButton
+              icon="i-lucide-play"
+              :loading="running"
+              :disabled="running"
+              @click="runSimulation"
+            >
+              Run Scenario
+            </UButton>
+          </template>
+
+          <template v-else>
+            <UAlert
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-users"
+              title="Population 001"
+              description="Deterministic ten-Agent isolation baseline using the frozen Farming Resistance v1 model."
+            />
+
+            <UButton
+              icon="i-lucide-play"
+              :loading="running"
+              :disabled="running"
+              @click="runPopulationSimulation"
+            >
+              Run Population
+            </UButton>
+          </template>
         </div>
       </UCard>
 
@@ -274,6 +398,239 @@ async function runSimulation() {
         title="Simulation failed"
         :description="errorMessage"
       />
+
+      <template v-if="populationResult">
+        <UCard>
+          <template #header>
+            <div
+              class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+            >
+              <div>
+                <p class="text-sm text-muted">
+                  Population result
+                </p>
+
+                <h2 class="mt-1 text-xl font-semibold">
+                  {{ populationResult.population.name }}
+                </h2>
+
+                <p
+                  v-if="populationResult.population.description"
+                  class="mt-1 text-sm text-muted"
+                >
+                  {{ populationResult.population.description }}
+                </p>
+              </div>
+
+              <UBadge variant="subtle">
+                {{ populationResult.population.id }}
+              </UBadge>
+            </div>
+          </template>
+
+          <dl
+            class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <div>
+              <dt class="text-sm text-muted">
+                Agents
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold">
+                {{ populationResult.summary.agentCount }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-sm text-muted">
+                Allowed
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold">
+                {{ populationResult.summary.allowedCount }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-sm text-muted">
+                Denied
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold">
+                {{ populationResult.summary.deniedCount }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-sm text-muted">
+                Average Composite
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold">
+                {{
+                  populationResult.summary.compositeScore
+                    ?.average ?? '—'
+                }}
+              </dd>
+            </div>
+          </dl>
+
+          <div class="mt-5 border-t border-default pt-5">
+            <p class="text-sm text-muted">
+              Model
+            </p>
+            <p class="mt-1 font-mono text-sm">
+              {{ populationResult.model.modelId }}
+              /
+              {{ populationResult.model.modelVersion }}
+              ·
+              {{ populationResult.model.configurationHash }}
+            </p>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div>
+              <h2 class="text-xl font-semibold">
+                Composite Trust Distribution
+              </h2>
+
+              <p class="mt-1 text-sm text-muted">
+                Distribution of authoritative Composite Trust
+                scores returned for the simulated Agents.
+              </p>
+            </div>
+          </template>
+
+          <div
+            v-if="compositeTrustDistribution.length"
+            class="space-y-4"
+          >
+            <div
+              v-for="bucket in compositeTrustDistribution"
+              :key="bucket.score"
+              class="grid grid-cols-[4rem_1fr_4rem] items-center gap-4"
+            >
+              <div class="font-mono text-sm">
+                {{ bucket.score }}
+              </div>
+
+              <div
+                class="h-8 overflow-hidden rounded-md bg-elevated"
+              >
+                <div
+                  class="flex h-full min-w-8 items-center justify-end rounded-md bg-primary px-2 text-xs font-semibold text-inverted"
+                  :style="{
+                    width: `${bucket.percentage}%`
+                  }"
+                >
+                  {{ bucket.count }}
+                </div>
+              </div>
+
+              <div class="text-right text-sm text-muted">
+                {{ bucket.count }}
+                Agent{{ bucket.count === 1 ? '' : 's' }}
+              </div>
+            </div>
+
+            <div
+              class="grid grid-cols-[4rem_1fr_4rem] gap-4 text-xs text-muted"
+            >
+              <div>Score</div>
+              <div>
+                Relative population count
+              </div>
+              <div class="text-right">
+                Count
+              </div>
+            </div>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div>
+              <h2 class="text-xl font-semibold">
+                Agent Results
+              </h2>
+
+              <p class="mt-1 text-sm text-muted">
+                Authoritative Agent, Domain, and Composite Trust
+                scores for each simulated Agent.
+              </p>
+            </div>
+          </template>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-default">
+                  <th class="px-3 py-3 font-medium">
+                    Agent
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Agent Trust
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Domain Trust
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Composite
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Decision
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr
+                  v-for="agent in populationResult.agents"
+                  :key="agent.agentId"
+                  class="border-b border-default last:border-0"
+                >
+                  <td class="px-3 py-3 font-mono">
+                    {{ agent.agentId }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ agent.agentTrustScore }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ agent.domainTrustScore }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ agent.compositeTrustScore }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right">
+                    <UBadge
+                      :color="
+                        agent.allowed
+                          ? 'success'
+                          : 'error'
+                      "
+                    >
+                      {{
+                        agent.allowed
+                          ? 'ALLOW'
+                          : 'DENY'
+                      }}
+                    </UBadge>
+
+                    <p
+                      v-if="agent.reason"
+                      class="mt-1 text-xs text-muted"
+                    >
+                      {{ agent.reason }}
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </UCard>
+      </template>
 
       <template v-if="result">
         <UCard>

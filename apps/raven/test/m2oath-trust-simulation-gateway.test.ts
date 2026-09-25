@@ -7,7 +7,8 @@ import {
 
 import type {
   RunTrustPolicyWorkbenchSimulationRequest,
-  TrustPolicyWorkbenchResult
+  TrustPolicyWorkbenchResult,
+  TrustPopulationWorkbenchResult
 } from '@m2oath/trust-simulation-client'
 
 import {
@@ -59,6 +60,9 @@ describe(
           new M2OathTrustSimulationGateway({
             client: {
               run
+            },
+            populationClient: {
+              run: vi.fn()
             }
           })
 
@@ -71,6 +75,65 @@ describe(
         expect(run).toHaveBeenCalledWith(
           request
         )
+      }
+    )
+
+    it(
+      'delegates the population simulation to the remote client',
+      async () => {
+        const result:
+          TrustPopulationWorkbenchResult = {
+            population: {
+              id: 'population-001',
+              name: 'Population 001',
+              description:
+                'Deterministic ten-Agent population isolation baseline.'
+            },
+
+            model: {
+              modelId:
+                'm2oath-workbench',
+              modelVersion:
+                '3',
+              configurationHash:
+                'farming-resistance-v1'
+            },
+
+            summary: {
+              agentCount: 10,
+              checkpointCount: 10,
+              allowedCount: 5,
+              deniedCount: 5,
+              compositeScore: {
+                minimum: 50,
+                maximum: 60,
+                average: 55
+              }
+            },
+
+            agents: []
+          }
+
+        const run =
+          vi.fn()
+            .mockResolvedValue(result)
+
+        const gateway =
+          new M2OathTrustSimulationGateway({
+            client: {
+              run: vi.fn()
+            },
+            populationClient: {
+              run
+            }
+          })
+
+        await expect(
+          gateway.runPopulation()
+        ).resolves.toBe(result)
+
+        expect(run).toHaveBeenCalledTimes(1)
+        expect(run).toHaveBeenCalledWith()
       }
     )
 
@@ -90,6 +153,9 @@ describe(
           new M2OathTrustSimulationGateway({
             client: {
               run
+            },
+            populationClient: {
+              run: vi.fn()
             }
           })
 

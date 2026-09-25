@@ -161,3 +161,43 @@ export interface TrustPolicyWorkbenchResult {
   timeline: TrustPolicyWorkbenchTimelinePoint[]
 }
 
+export interface TrustPopulationScoreSummary {
+  minimum: number
+  maximum: number
+  average: number
+}
+
+export interface TrustPopulationWorkbenchAgentResult {
+  agentId: string
+  agentTrustScore: number
+  domainTrustScore: number
+  compositeTrustScore: number
+  allowed: boolean
+  reason?: string
+}
+
+export interface TrustPopulationWorkbenchResult {
+  population: {
+    id: string
+    name: string
+    description?: string
+  }
+
+  model: {
+    modelId: string
+    modelVersion: string
+    configurationHash: string
+  }
+
+  summary: {
+    agentCount: number
+    checkpointCount: number
+    allowedCount: number
+    deniedCount: number
+    compositeScore:
+      TrustPopulationScoreSummary | undefined
+  }
+
+  agents: TrustPopulationWorkbenchAgentResult[]
+}
+

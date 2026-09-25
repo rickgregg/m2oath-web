@@ -7,7 +7,8 @@ import type {
   RegisterAgentRequest,
   RegisterAgentResponse,
   RunTrustPolicyWorkbenchSimulationRequest,
-  TrustPolicyWorkbenchResult
+  TrustPolicyWorkbenchResult,
+  TrustPopulationWorkbenchResult
 } from './types.js'
 
 export interface ControlPlaneClient {
@@ -34,4 +35,7 @@ export interface ControlPlaneClient {
   runTrustSimulation(
     request: RunTrustPolicyWorkbenchSimulationRequest
   ): Promise<TrustPolicyWorkbenchResult>
+
+  runTrustPopulationSimulation():
+    Promise<TrustPopulationWorkbenchResult>
 }

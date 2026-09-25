@@ -18,7 +18,10 @@ export type {
   TrustSimulationPolicyDecision,
   TrustPolicyWorkbenchSource,
   TrustPolicyWorkbenchTimelinePoint,
-  TrustPolicyWorkbenchResult
+  TrustPolicyWorkbenchResult,
+  TrustPopulationScoreSummary,
+  TrustPopulationWorkbenchAgentResult,
+  TrustPopulationWorkbenchResult
 } from './types.js'
 
 export type {

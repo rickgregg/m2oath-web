@@ -8,7 +8,8 @@ import type {
   RegisterAgentRequest,
   RegisterAgentResponse,
   RunTrustPolicyWorkbenchSimulationRequest,
-  TrustPolicyWorkbenchResult
+  TrustPolicyWorkbenchResult,
+  TrustPopulationWorkbenchResult
 } from './types.js'
 
 export interface HttpControlPlaneClientOptions {
@@ -120,6 +121,16 @@ export class HttpControlPlaneClient implements ControlPlaneClient {
           'content-type': 'application/json'
         },
         body: JSON.stringify(request)
+      }
+    )
+  }
+
+  async runTrustPopulationSimulation():
+    Promise<TrustPopulationWorkbenchResult> {
+    return this.request<TrustPopulationWorkbenchResult>(
+      '/v1/developers/me/trust-population-simulations',
+      {
+        method: 'POST'
       }
     )
   }

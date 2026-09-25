@@ -876,6 +876,164 @@ describe('M2Oath control-plane API', () => {
 
 
   it(
+    'runs the Trust population simulation for an authenticated Developer',
+    async () => {
+      const result = {
+        population: {
+          id: 'population-001',
+          name: 'Population 001',
+          description:
+            'Deterministic ten-Agent population isolation baseline.'
+        },
+
+        model: {
+          modelId: 'm2oath-workbench',
+          modelVersion: '3',
+          configurationHash:
+            'farming-resistance-v1'
+        },
+
+        summary: {
+          agentCount: 10,
+          checkpointCount: 10,
+          allowedCount: 5,
+          deniedCount: 5,
+          compositeScore: {
+            minimum: 50,
+            maximum: 60,
+            average: 55
+          }
+        },
+
+        agents: []
+      }
+
+      let populationRuns = 0
+
+      const trustSimulationGateway = {
+        runPopulation:
+          async () => {
+            populationRuns += 1
+            return result
+          }
+      } as M2OathTrustSimulationGateway
+
+      const {
+        baseUrl
+      } =
+        await startServer(
+          trustSimulationGateway
+        )
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-population-simulations`,
+          {
+            method: 'POST',
+
+            headers: {
+              authorization:
+                `Bearer ${TEST_DEVELOPER_TOKEN}`
+            }
+          }
+        )
+
+      expect(response.status).toBe(200)
+
+      expect(
+        await response.json()
+      ).toEqual(result)
+
+      expect(populationRuns).toBe(1)
+    }
+  )
+
+  it(
+    'requires Developer authentication for Trust population simulation',
+    async () => {
+      const trustSimulationGateway = {
+        runPopulation:
+          async () => {
+            throw new Error(
+              'Population simulation gateway must not be called'
+            )
+          }
+      } as M2OathTrustSimulationGateway
+
+      const {
+        baseUrl
+      } =
+        await startServer(
+          trustSimulationGateway
+        )
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-population-simulations`,
+          {
+            method: 'POST'
+          }
+        )
+
+      expect(response.status).toBe(401)
+
+      expect(
+        await response.json()
+      ).toEqual({
+        error:
+          'developer-authentication-required'
+      })
+    }
+  )
+
+  it(
+    'translates authoritative Trust population simulation failures',
+    async () => {
+      const trustSimulationGateway = {
+        runPopulation:
+          async () => {
+            throw new RemoteTrustPolicyWorkbenchSimulationError(
+              401,
+              {
+                error:
+                  'authentication-failed'
+              }
+            )
+          }
+      } as M2OathTrustSimulationGateway
+
+      const {
+        baseUrl
+      } =
+        await startServer(
+          trustSimulationGateway
+        )
+
+      const response =
+        await fetch(
+          `${baseUrl}/v1/developers/me/trust-population-simulations`,
+          {
+            method: 'POST',
+
+            headers: {
+              authorization:
+                `Bearer ${TEST_DEVELOPER_TOKEN}`
+            }
+          }
+        )
+
+      expect(response.status).toBe(502)
+
+      expect(
+        await response.json()
+      ).toEqual({
+        error:
+          'trust-simulation-service-authentication-failed'
+      })
+    }
+  )
+
+  it(
     'runs a Trust simulation for an authenticated Developer',
     async () => {
       const result = {

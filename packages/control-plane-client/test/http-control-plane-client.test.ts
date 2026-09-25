@@ -378,4 +378,86 @@ describe('HttpControlPlaneClient', () => {
     )
   })
 
+  it(
+    'runs a Developer Trust population simulation',
+    async () => {
+      const result = {
+        population: {
+          id: 'population-001',
+          name: 'Population 001',
+          description:
+            'Deterministic ten-Agent population isolation baseline.'
+        },
+
+        model: {
+          modelId: 'm2oath-workbench',
+          modelVersion: '3',
+          configurationHash:
+            'farming-resistance-v1'
+        },
+
+        summary: {
+          agentCount: 10,
+          checkpointCount: 10,
+          allowedCount: 5,
+          deniedCount: 5,
+          compositeScore: {
+            minimum: 50,
+            maximum: 60,
+            average: 55
+          }
+        },
+
+        agents: []
+      }
+
+      const fetch =
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify(result),
+            {
+              status: 200,
+              headers: {
+                'content-type':
+                  'application/json'
+              }
+            }
+          )
+        )
+
+      const client =
+        new HttpControlPlaneClient({
+          baseUrl:
+            'https://control.m2oath.example/',
+          bearerToken:
+            'developer-token',
+          fetch
+        })
+
+      const response =
+        await client.runTrustPopulationSimulation()
+
+      expect(response).toEqual(result)
+      expect(fetch).toHaveBeenCalledOnce()
+
+      const [url, init] =
+        fetch.mock.calls[0]!
+
+      expect(url).toBe(
+        'https://control.m2oath.example/v1/developers/me/trust-population-simulations'
+      )
+
+      expect(init?.method).toBe('POST')
+
+      const headers =
+        new Headers(init?.headers)
+
+      expect(
+        headers.get('authorization')
+      ).toBe('Bearer developer-token')
+
+      expect(init?.body).toBeUndefined()
+    }
+  )
+
 })

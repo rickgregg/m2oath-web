@@ -32,7 +32,8 @@ import {
 } from './m2oath-agent-registration-gateway.js'
 
 import {
-  RemoteTrustPolicyWorkbenchSimulationClient
+  RemoteTrustPolicyWorkbenchSimulationClient,
+  RemoteTrustPopulationWorkbenchSimulationClient
 } from '@m2oath/trust-simulation-client'
 
 import {
@@ -225,10 +226,17 @@ const trustSimulationClient =
     trustTransport
   )
 
+const trustPopulationSimulationClient =
+  new RemoteTrustPopulationWorkbenchSimulationClient(
+    trustTransport
+  )
+
 const trustSimulationGateway =
   new M2OathTrustSimulationGateway({
     client:
-      trustSimulationClient
+      trustSimulationClient,
+    populationClient:
+      trustPopulationSimulationClient
   })
 
 const providerRegistry =

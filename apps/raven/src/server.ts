@@ -375,6 +375,102 @@ async function handleRequest(
   if (
     method === 'POST' &&
     url.pathname ===
+      '/v1/developers/me/trust-population-simulations'
+  ) {
+    const authentication =
+      getBearerAuthenticationRequest(request)
+
+    if (!authentication) {
+      sendJson(response, 401, {
+        error: 'developer-authentication-required'
+      })
+      return
+    }
+
+    if (
+      !options.developerAccountGateway ||
+      !options.trustSimulationGateway
+    ) {
+      sendJson(response, 503, {
+        error: 'trust-simulation-service-unavailable'
+      })
+      return
+    }
+
+    try {
+      /*
+       * Resolve the Developer at Raven before crossing the
+       * authoritative M2Oath Trust service boundary.
+       *
+       * Population 001 is fixed by the Trust service during
+       * Day 11. Raven does not select or calculate its model.
+       */
+      await options.developerAccountGateway.resolveAuthenticated(
+        authentication
+      )
+
+      const result =
+        await options.trustSimulationGateway.runPopulation()
+
+      sendJson(response, 200, result)
+    } catch (error) {
+      if (
+        error instanceof DeveloperSessionError &&
+        (
+          error.stage === 'authentication' ||
+          error.stage === 'identity'
+        )
+      ) {
+        sendJson(response, 401, {
+          error: error.message
+        })
+        return
+      }
+
+      if (
+        error instanceof
+          RemoteTrustPolicyWorkbenchSimulationError
+      ) {
+        if (error.status === 400) {
+          sendJson(response, 400, {
+            error:
+              'invalid-trust-simulation-request'
+          })
+          return
+        }
+
+        if (error.status === 403) {
+          sendJson(response, 403, {
+            error:
+              'trust-simulation-not-authorized'
+          })
+          return
+        }
+
+        if (error.status === 401) {
+          sendJson(response, 502, {
+            error:
+              'trust-simulation-service-authentication-failed'
+          })
+          return
+        }
+
+        sendJson(response, 502, {
+          error:
+            'trust-simulation-service-failed'
+        })
+        return
+      }
+
+      throw error
+    }
+
+    return
+  }
+
+  if (
+    method === 'POST' &&
+    url.pathname ===
       '/v1/developers/me/trust-simulations'
   ) {
     const authentication =
