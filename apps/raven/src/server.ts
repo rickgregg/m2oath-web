@@ -400,6 +400,7 @@ async function handleRequest(
     const body =
       await readJsonBody<{
         scenarioId?: unknown
+        modelConfigurationId?: unknown
       }>(request)
 
     try {
@@ -422,6 +423,10 @@ async function handleRequest(
               Parameters<
                 M2OathTrustSimulationGateway['run']
               >[0]['scenarioId']
+            modelConfigurationId:
+              Parameters<
+                M2OathTrustSimulationGateway['run']
+              >[0]['modelConfigurationId']
           }
         )
 

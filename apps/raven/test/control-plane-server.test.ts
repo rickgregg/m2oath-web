@@ -936,7 +936,9 @@ describe('M2Oath control-plane API', () => {
             body:
               JSON.stringify({
                 scenarioId:
-                  'normal-trust-growth'
+                  'normal-trust-growth',
+                modelConfigurationId:
+                  'farming-resistance-v1'
               })
           }
         )
@@ -950,7 +952,9 @@ describe('M2Oath control-plane API', () => {
       expect(requests).toEqual([
         {
           scenarioId:
-            'normal-trust-growth'
+            'normal-trust-growth',
+          modelConfigurationId:
+            'farming-resistance-v1'
         }
       ])
     }

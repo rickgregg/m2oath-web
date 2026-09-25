@@ -334,7 +334,9 @@ describe('HttpControlPlaneClient', () => {
 
     const response =
       await client.runTrustSimulation({
-        scenarioId: 'normal-trust-growth'
+        scenarioId: 'normal-trust-growth',
+        modelConfigurationId:
+          'farming-resistance-v1'
       })
 
     expect(response).toEqual(result)
@@ -364,7 +366,9 @@ describe('HttpControlPlaneClient', () => {
     expect(
       JSON.parse(String(init?.body))
     ).toEqual({
-      scenarioId: 'normal-trust-growth'
+      scenarioId: 'normal-trust-growth',
+      modelConfigurationId:
+        'farming-resistance-v1'
     })
 
     expect(

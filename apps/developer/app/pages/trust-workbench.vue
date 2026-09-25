@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  TrustPolicyWorkbenchModelConfigurationId,
   TrustPolicyWorkbenchResult,
   TrustSimulationScenarioId
 } from '@m2oath/control-plane-client'
@@ -12,11 +13,38 @@ useSeoMeta({
   title: 'Trust Policy Workbench'
 })
 
+interface ModelConfigurationOption {
+  label: string
+  value: TrustPolicyWorkbenchModelConfigurationId
+  description: string
+}
+
 interface ScenarioOption {
   label: string
   value: TrustSimulationScenarioId
   description: string
 }
+
+const modelConfigurations: ModelConfigurationOption[] = [
+  {
+    label: 'Canonical Day 10',
+    value: 'canonical-day-10',
+    description:
+      'Run the canonical Day 10 trust model baseline.'
+  },
+  {
+    label: 'Operation Equivalence v1',
+    value: 'operation-equivalence-v1',
+    description:
+      'Run the registered model with operation-equivalence protections.'
+  },
+  {
+    label: 'Farming Resistance v1',
+    value: 'farming-resistance-v1',
+    description:
+      'Run the registered farming-resistance trust model.'
+  }
+]
 
 const scenarios: ScenarioOption[] = [
   {
@@ -87,6 +115,11 @@ const scenarios: ScenarioOption[] = [
   }
 ]
 
+const selectedModelConfiguration =
+  ref<TrustPolicyWorkbenchModelConfigurationId>(
+    'farming-resistance-v1'
+  )
+
 const selectedScenario =
   ref<TrustSimulationScenarioId>(
     'normal-trust-growth'
@@ -103,6 +136,16 @@ const result =
 const errorMessage =
   ref<string | null>(
     null
+  )
+
+const selectedModelConfigurationDescription =
+  computed(
+    () =>
+      modelConfigurations.find(
+        model =>
+          model.value
+          === selectedModelConfiguration.value
+      )?.description
   )
 
 const selectedScenarioDescription =
@@ -129,7 +172,9 @@ async function runSimulation() {
 
           body: {
             scenarioId:
-              selectedScenario.value
+              selectedScenario.value,
+            modelConfigurationId:
+              selectedModelConfiguration.value
           }
         }
       )
@@ -183,6 +228,20 @@ async function runSimulation() {
         </template>
 
         <div class="space-y-5">
+          <UFormField
+            label="Trust model"
+            :description="selectedModelConfigurationDescription"
+          >
+            <USelect
+              v-model="selectedModelConfiguration"
+              class="w-full"
+              :items="modelConfigurations"
+              label-key="label"
+              value-key="value"
+              :disabled="running"
+            />
+          </UFormField>
+
           <UFormField
             label="Trust scenario"
             :description="selectedScenarioDescription"

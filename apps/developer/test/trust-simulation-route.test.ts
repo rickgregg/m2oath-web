@@ -111,7 +111,9 @@ describe(
         'readBody',
         vi.fn().mockResolvedValue({
           scenarioId:
-            'normal-trust-growth'
+            'normal-trust-growth',
+          modelConfigurationId:
+            'farming-resistance-v1'
         })
       )
 
@@ -185,7 +187,9 @@ describe(
           runTrustSimulation
         ).toHaveBeenCalledWith({
           scenarioId:
-            'normal-trust-growth'
+            'normal-trust-growth',
+          modelConfigurationId:
+            'farming-resistance-v1'
         })
 
         expect(

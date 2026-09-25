@@ -13,6 +13,7 @@ import {
 
 interface TrustSimulationBody {
   scenarioId?: unknown
+  modelConfigurationId?: unknown
 }
 
 export default defineEventHandler(async (event) => {
@@ -45,6 +46,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  if (
+    typeof body.modelConfigurationId !== 'string'
+    || !body.modelConfigurationId.trim()
+  ) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        'Trust simulation model configuration ID is required'
+    })
+  }
+
   const config = useRuntimeConfig(event)
 
   const client =
@@ -58,7 +70,9 @@ export default defineEventHandler(async (event) => {
 
   const request = {
     scenarioId:
-      body.scenarioId.trim()
+      body.scenarioId.trim(),
+    modelConfigurationId:
+      body.modelConfigurationId.trim()
   } as RunTrustPolicyWorkbenchSimulationRequest
 
   try {

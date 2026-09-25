@@ -10,6 +10,7 @@ export type {
   RegisterAgentRequest,
   RegisterAgentResponse,
   TrustSimulationScenarioId,
+  TrustPolicyWorkbenchModelConfigurationId,
   RunTrustPolicyWorkbenchSimulationRequest,
   TrustSimulationOperation,
   TrustSimulationTrustState,

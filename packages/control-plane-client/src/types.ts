@@ -71,8 +71,15 @@ export type TrustSimulationScenarioId =
   | 'combined-farming-attack'
   | 'trusted-domain-composition'
 
+export type TrustPolicyWorkbenchModelConfigurationId =
+  | 'canonical-day-10'
+  | 'operation-equivalence-v1'
+  | 'farming-resistance-v1'
+
 export interface RunTrustPolicyWorkbenchSimulationRequest {
   scenarioId: TrustSimulationScenarioId
+  modelConfigurationId:
+    TrustPolicyWorkbenchModelConfigurationId
 }
 
 export interface TrustSimulationOperation {
