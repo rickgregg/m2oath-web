@@ -383,10 +383,10 @@ describe('HttpControlPlaneClient', () => {
     async () => {
       const result = {
         population: {
-          id: 'population-001',
-          name: 'Population 001',
+          id: 'population-002',
+          name: 'Population 002',
           description:
-            'Deterministic ten-Agent population isolation baseline.'
+            'Deterministic 100-Agent heterogeneous behavioral population.'
         },
 
         model: {
@@ -397,14 +397,14 @@ describe('HttpControlPlaneClient', () => {
         },
 
         summary: {
-          agentCount: 10,
-          checkpointCount: 10,
-          allowedCount: 5,
-          deniedCount: 5,
+          agentCount: 100,
+          checkpointCount: 100,
+          allowedCount: 70,
+          deniedCount: 30,
           compositeScore: {
             minimum: 50,
-            maximum: 60,
-            average: 55
+            maximum: 65,
+            average: 56.296875
           }
         },
 

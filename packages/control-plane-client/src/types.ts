@@ -167,13 +167,33 @@ export interface TrustPopulationScoreSummary {
   average: number
 }
 
-export interface TrustPopulationWorkbenchAgentResult {
-  agentId: string
+/**
+ * One authoritative trust observation for an Agent in a population
+ * simulation.
+ *
+ * This is an observability artifact only. Consumers must not use it
+ * to recalculate authoritative trust or policy decisions.
+ */
+export interface TrustPopulationWorkbenchTimelinePoint {
+  sequence: number
+  label?: string
+  time: string
   agentTrustScore: number
   domainTrustScore: number
   compositeTrustScore: number
   allowed: boolean
   reason?: string
+}
+
+export interface TrustPopulationWorkbenchAgentResult {
+  agentId: string
+  cohortId?: string
+  agentTrustScore: number
+  domainTrustScore: number
+  compositeTrustScore: number
+  allowed: boolean
+  reason?: string
+  timeline: TrustPopulationWorkbenchTimelinePoint[]
 }
 
 export interface TrustPopulationWorkbenchResult {

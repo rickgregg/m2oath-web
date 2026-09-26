@@ -2,6 +2,7 @@
 import type {
   TrustPolicyWorkbenchModelConfigurationId,
   TrustPolicyWorkbenchResult,
+  TrustPopulationWorkbenchAgentResult,
   TrustPopulationWorkbenchResult,
   TrustSimulationScenarioId
 } from '@m2oath/control-plane-client'
@@ -13,6 +14,31 @@ definePageMeta({
 useSeoMeta({
   title: 'Trust Policy Workbench'
 })
+
+const cohortDefinitions: Record<string, string> = {
+  'normal-trusted':
+    'Agent with successful usage plus independent Trusted Domain evidence. Represents normal trust accumulation.',
+  'cold-start':
+    'New Agent with no accumulated usage or Domain Trust evidence. Tests provisional and default trust behavior.',
+  'usage-only':
+    'Agent with successful usage evidence but no Domain Trust evidence. Tests how Agent Trust alone contributes to the authorization decision.',
+  'domain-only':
+    'Agent with Trusted Domain evidence but no successful usage evidence. Tests how Domain Trust alone contributes to the authorization decision.',
+  'repetition-farming':
+    'Agent repeatedly performs the same successful operation. Tests diminishing returns against reputation farming through repetition.',
+  'fake-diversity':
+    'Agent performs equivalent or aliased operations intended to appear diverse. Tests whether operation equivalence prevents artificial diversity.',
+  'cross-operation-farming':
+    'Agent earns trust on one operation and then requests a different protected operation. Tests operation-scoped trust isolation.',
+  'authority-concentration':
+    'Domain evidence repeatedly comes from the same authority. Tests diminishing returns for concentrated evidence sources.',
+  'combined-farming':
+    'Agent combines multiple trust-building techniques across Agent Trust and Domain Trust. Tests how individually diminished evidence composes into a final trust decision.',
+  'stale-reputation':
+    'Agent previously accumulated trust, but the evidence has aged beyond the configured freshness window. Tests trust decay and stale-evidence handling.',
+  'unclassified':
+    'Simulation Agent without an assigned cohort classification.'
+}
 
 interface ModelConfigurationOption {
   label: string
@@ -224,6 +250,238 @@ const compositeTrustDistribution =
       )
   })
 
+const populationCohortAnalysis =
+  computed(() => {
+    if (!populationResult.value) {
+      return []
+    }
+
+    const cohorts =
+      new Map<
+        string,
+        {
+          agentCount: number
+          agentTrustTotal: number
+          domainTrustTotal: number
+          compositeTrustTotal: number
+          allowedCount: number
+          deniedCount: number
+        }
+      >()
+
+    for (
+      const agent
+      of populationResult.value.agents
+    ) {
+      const cohortId =
+        agent.cohortId ?? 'unclassified'
+
+      const cohort =
+        cohorts.get(cohortId) ?? {
+          agentCount: 0,
+          agentTrustTotal: 0,
+          domainTrustTotal: 0,
+          compositeTrustTotal: 0,
+          allowedCount: 0,
+          deniedCount: 0
+        }
+
+      cohort.agentCount += 1
+      cohort.agentTrustTotal +=
+        agent.agentTrustScore
+      cohort.domainTrustTotal +=
+        agent.domainTrustScore
+      cohort.compositeTrustTotal +=
+        agent.compositeTrustScore
+
+      if (agent.allowed) {
+        cohort.allowedCount += 1
+      } else {
+        cohort.deniedCount += 1
+      }
+
+      cohorts.set(
+        cohortId,
+        cohort
+      )
+    }
+
+    return [...cohorts.entries()]
+      .map(
+        ([cohortId, cohort]) => ({
+          cohortId,
+          agentCount: cohort.agentCount,
+          agentTrustScore:
+            cohort.agentTrustTotal
+            / cohort.agentCount,
+          domainTrustScore:
+            cohort.domainTrustTotal
+            / cohort.agentCount,
+          compositeTrustScore:
+            cohort.compositeTrustTotal
+            / cohort.agentCount,
+          allowedCount:
+            cohort.allowedCount,
+          deniedCount:
+            cohort.deniedCount
+        })
+      )
+  })
+
+const sortedPopulationAgents =
+  computed(() =>
+    populationResult.value
+      ? [...populationResult.value.agents]
+          .sort(
+            (left, right) =>
+              left.agentId.localeCompare(
+                right.agentId
+              )
+          )
+      : []
+  )
+
+const selectedPopulationAgent =
+  ref<TrustPopulationWorkbenchAgentResult | null>(
+    null
+  )
+
+const selectedPopulationAgentGraph =
+  computed(() => {
+    const agent =
+      selectedPopulationAgent.value
+
+    if (!agent || agent.timeline.length === 0) {
+      return null
+    }
+
+    const width = 800
+    const height = 320
+    const padding = {
+      top: 24,
+      right: 24,
+      bottom: 48,
+      left: 48
+    }
+
+    const plotWidth =
+      width - padding.left - padding.right
+
+    const plotHeight =
+      height - padding.top - padding.bottom
+
+    const times =
+      agent.timeline.map(
+        point =>
+          new Date(point.time).getTime()
+      )
+
+    const minimumTime =
+      Math.min(...times)
+
+    const maximumTime =
+      Math.max(...times)
+
+    const timeRange =
+      maximumTime - minimumTime
+
+    const xFor =
+      (time: string) => {
+        if (timeRange === 0) {
+          return padding.left
+            + plotWidth / 2
+        }
+
+        return padding.left
+          + (
+            (
+              new Date(time).getTime()
+              - minimumTime
+            )
+            / timeRange
+          )
+          * plotWidth
+      }
+
+    const yFor =
+      (score: number) =>
+        padding.top
+        + ((100 - score) / 100)
+        * plotHeight
+
+    const points =
+      agent.timeline.map(
+        point => ({
+          ...point,
+          x: xFor(point.time),
+          agentY:
+            yFor(point.agentTrustScore),
+          domainY:
+            yFor(point.domainTrustScore),
+          compositeY:
+            yFor(point.compositeTrustScore)
+        })
+      )
+
+    const polylineFor =
+      (
+        key:
+          | 'agentY'
+          | 'domainY'
+          | 'compositeY'
+      ) =>
+        points
+          .map(
+            point =>
+              `${point.x},${point[key]}`
+          )
+          .join(' ')
+
+    const thresholdY =
+      yFor(55)
+
+    const elapsedStartLabel =
+      '0m'
+
+    const elapsedMinutes =
+      Math.round(
+        timeRange / 60_000
+      )
+
+    const elapsedEndLabel =
+      `${elapsedMinutes}m`
+
+    return {
+      width,
+      height,
+      padding,
+      plotWidth,
+      plotHeight,
+      points,
+      agentPolyline:
+        polylineFor('agentY'),
+      domainPolyline:
+        polylineFor('domainY'),
+      compositePolyline:
+        polylineFor('compositeY'),
+      thresholdY,
+      elapsedStartLabel,
+      elapsedEndLabel
+    }
+  })
+
+function selectPopulationAgent(
+  agent: TrustPopulationWorkbenchAgentResult
+) {
+  selectedPopulationAgent.value =
+    agent
+}
+
+function closePopulationAgent() {
+  selectedPopulationAgent.value =
+    null
+}
+
 async function runPopulationSimulation() {
   running.value = true
   populationResult.value = null
@@ -375,8 +633,8 @@ async function runSimulation() {
               color="neutral"
               variant="subtle"
               icon="i-lucide-users"
-              title="Population 001"
-              description="Deterministic ten-Agent isolation baseline using the frozen Farming Resistance v1 model."
+              title="Population 002"
+              description="Deterministic 100-Agent heterogeneous behavioral population using the frozen Farming Resistance v1 model."
             />
 
             <UButton
@@ -549,6 +807,134 @@ async function runSimulation() {
           <template #header>
             <div>
               <h2 class="text-xl font-semibold">
+                Cohort Analysis
+              </h2>
+
+              <p class="mt-1 text-sm text-muted">
+                Aggregate view of the authoritative Agent results,
+                grouped by simulation cohort.
+              </p>
+            </div>
+          </template>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-default">
+                  <th class="px-3 py-3 font-medium">
+                    Cohort
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Agents
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Agent Trust
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Domain Trust
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Composite
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Allowed
+                  </th>
+                  <th class="px-3 py-3 text-right font-medium">
+                    Denied
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr
+                  v-for="cohort in populationCohortAnalysis"
+                  :key="cohort.cohortId"
+                  class="border-b border-default last:border-0"
+                >
+                  <td class="px-3 py-3">
+                    <UPopover>
+                      <UBadge
+                        color="neutral"
+                        variant="subtle"
+                        class="cursor-pointer"
+                      >
+                        {{ cohort.cohortId }}
+                      </UBadge>
+
+                      <template #content>
+                        <div class="max-w-sm p-4">
+                          <p class="font-medium">
+                            {{ cohort.cohortId }}
+                          </p>
+
+                          <p class="mt-2 text-sm text-muted">
+                            {{
+                              cohortDefinitions[
+                                cohort.cohortId
+                              ]
+                              ?? cohortDefinitions.unclassified
+                            }}
+                          </p>
+
+                          <div
+                            class="mt-3 border-t border-default pt-3"
+                          >
+                            <p class="text-xs font-medium">
+                              Simulation cohort
+                            </p>
+
+                            <p class="mt-1 text-xs text-muted">
+                              Descriptive metadata only. This
+                              classification is not supplied to the
+                              trust model and does not participate in
+                              trust calculation.
+                            </p>
+                          </div>
+                        </div>
+                      </template>
+                    </UPopover>
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ cohort.agentCount }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ cohort.agentTrustScore }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ cohort.domainTrustScore }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ cohort.compositeTrustScore }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ cohort.allowedCount }}
+                  </td>
+
+                  <td class="px-3 py-3 text-right font-mono">
+                    {{ cohort.deniedCount }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="mt-4 text-xs text-muted">
+            Trust scores are cohort averages calculated only for
+            presentation from the authoritative per-Agent results.
+            Cohort metadata is not trust evidence and does not
+            participate in trust calculation.
+          </p>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div>
+              <h2 class="text-xl font-semibold">
                 Agent Results
               </h2>
 
@@ -566,6 +952,9 @@ async function runSimulation() {
                   <th class="px-3 py-3 font-medium">
                     Agent
                   </th>
+                  <th class="px-3 py-3 font-medium">
+                    Cohort
+                  </th>
                   <th class="px-3 py-3 text-right font-medium">
                     Agent Trust
                   </th>
@@ -582,13 +971,66 @@ async function runSimulation() {
               </thead>
 
               <tbody>
-                <tr
-                  v-for="agent in populationResult.agents"
+                <template
+                  v-for="agent in sortedPopulationAgents"
                   :key="agent.agentId"
-                  class="border-b border-default last:border-0"
                 >
+                  <tr
+                    class="border-b border-default"
+                  >
                   <td class="px-3 py-3 font-mono">
-                    {{ agent.agentId }}
+                    <button
+                      type="button"
+                      class="cursor-pointer underline decoration-dotted underline-offset-4 hover:decoration-solid"
+                      @click="selectPopulationAgent(agent)"
+                    >
+                      {{ agent.agentId }}
+                    </button>
+                  </td>
+
+                  <td class="px-3 py-3">
+                    <UPopover>
+                      <UBadge
+                        color="neutral"
+                        variant="subtle"
+                        class="cursor-pointer"
+                      >
+                        {{ agent.cohortId ?? 'unclassified' }}
+                      </UBadge>
+
+                      <template #content>
+                        <div class="max-w-sm p-4">
+                          <p class="font-medium">
+                            {{ agent.cohortId ?? 'unclassified' }}
+                          </p>
+
+                          <p class="mt-2 text-sm text-muted">
+                            {{
+                              cohortDefinitions[
+                                agent.cohortId
+                                ?? 'unclassified'
+                              ]
+                              ?? cohortDefinitions.unclassified
+                            }}
+                          </p>
+
+                          <div
+                            class="mt-3 border-t border-default pt-3"
+                          >
+                            <p class="text-xs font-medium">
+                              Simulation cohort
+                            </p>
+
+                            <p class="mt-1 text-xs text-muted">
+                              Descriptive metadata only. This
+                              classification is not supplied to the
+                              trust model and does not participate in
+                              trust calculation.
+                            </p>
+                          </div>
+                        </div>
+                      </template>
+                    </UPopover>
                   </td>
 
                   <td class="px-3 py-3 text-right font-mono">
@@ -625,11 +1067,436 @@ async function runSimulation() {
                       {{ agent.reason }}
                     </p>
                   </td>
-                </tr>
+                  </tr>
+
+                  <tr
+                    v-if="
+                      selectedPopulationAgent?.agentId
+                      === agent.agentId
+                      && selectedPopulationAgentGraph
+                    "
+                    class="border-b border-default"
+                  >
+                    <td
+                      colspan="6"
+                      class="px-3 py-4"
+                    >
+                      <UCard>
+                        <template #header>
+                          <div
+                            class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                          >
+                            <div>
+                              <p class="text-sm text-muted">
+                                Agent trust history
+                              </p>
+
+                              <h2 class="mt-1 text-xl font-semibold">
+                                Agent Trust Over Time
+                              </h2>
+
+                              <p class="mt-1 font-mono text-sm">
+                                {{ selectedPopulationAgent.agentId }}
+                              </p>
+
+                              <p class="mt-2 text-sm text-muted">
+                                Authoritative trust scores at simulation
+                                checkpoints. Lines connect observed checkpoints
+                                for visualization only and do not imply continuous
+                                trust measurement.
+                              </p>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                              <UBadge
+                                color="neutral"
+                                variant="subtle"
+                              >
+                                {{
+                                  selectedPopulationAgent.cohortId
+                                  ?? 'unclassified'
+                                }}
+                              </UBadge>
+
+                              <UButton
+                                color="neutral"
+                                variant="ghost"
+                                icon="i-lucide-x"
+                                aria-label="Close Agent trust history"
+                                @click="closePopulationAgent"
+                              >
+                                Close
+                              </UButton>
+                            </div>
+                          </div>
+                        </template>
+
+                        <div class="space-y-6">
+                          <div
+                            class="flex flex-wrap gap-x-6 gap-y-2 text-sm"
+                          >
+                            <div class="flex items-center gap-2">
+                              <span
+                                class="inline-block h-0.5 w-6 bg-primary"
+                              />
+                              <span>Agent Trust</span>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                              <span
+                                class="inline-block h-0.5 w-6 border-t-2 border-dashed border-warning"
+                              />
+                              <span>Domain Trust</span>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                              <span
+                                class="inline-block h-1 w-6 bg-success"
+                              />
+                              <span>Composite Trust</span>
+                            </div>
+
+                            <div class="flex items-center gap-2 text-muted">
+                              <span
+                                class="inline-block h-0.5 w-6 border-t border-dashed border-error"
+                              />
+                              <span>Policy threshold · 55</span>
+                            </div>
+                          </div>
+
+                          <div class="overflow-x-auto">
+                            <svg
+                              :viewBox="
+                                `0 0 ${selectedPopulationAgentGraph.width} ${selectedPopulationAgentGraph.height}`
+                              "
+                              class="min-w-[700px] w-full"
+                              role="img"
+                              :aria-label="
+                                `Trust over time for ${selectedPopulationAgent.agentId}`
+                              "
+                            >
+                              <line
+                                v-for="score in [0, 25, 50, 75, 100]"
+                                :key="`grid-${score}`"
+                                :x1="selectedPopulationAgentGraph.padding.left"
+                                :x2="
+                                  selectedPopulationAgentGraph.width
+                                  - selectedPopulationAgentGraph.padding.right
+                                "
+                                :y1="
+                                  selectedPopulationAgentGraph.padding.top
+                                  + ((100 - score) / 100)
+                                  * selectedPopulationAgentGraph.plotHeight
+                                "
+                                :y2="
+                                  selectedPopulationAgentGraph.padding.top
+                                  + ((100 - score) / 100)
+                                  * selectedPopulationAgentGraph.plotHeight
+                                "
+                                stroke="currentColor"
+                                stroke-opacity="0.12"
+                              />
+
+                              <text
+                                v-for="score in [0, 25, 50, 75, 100]"
+                                :key="`label-${score}`"
+                                :x="
+                                  selectedPopulationAgentGraph.padding.left
+                                  - 10
+                                "
+                                :y="
+                                  selectedPopulationAgentGraph.padding.top
+                                  + ((100 - score) / 100)
+                                  * selectedPopulationAgentGraph.plotHeight
+                                  + 4
+                                "
+                                text-anchor="end"
+                                fill="currentColor"
+                                opacity="0.65"
+                                font-size="12"
+                              >
+                                {{ score }}
+                              </text>
+
+                              <line
+                                :x1="selectedPopulationAgentGraph.padding.left"
+                                :x2="selectedPopulationAgentGraph.padding.left"
+                                :y1="selectedPopulationAgentGraph.padding.top"
+                                :y2="
+                                  selectedPopulationAgentGraph.height
+                                  - selectedPopulationAgentGraph.padding.bottom
+                                "
+                                stroke="currentColor"
+                                stroke-opacity="0.35"
+                              />
+
+                              <line
+                                :x1="selectedPopulationAgentGraph.padding.left"
+                                :x2="
+                                  selectedPopulationAgentGraph.width
+                                  - selectedPopulationAgentGraph.padding.right
+                                "
+                                :y1="
+                                  selectedPopulationAgentGraph.height
+                                  - selectedPopulationAgentGraph.padding.bottom
+                                "
+                                :y2="
+                                  selectedPopulationAgentGraph.height
+                                  - selectedPopulationAgentGraph.padding.bottom
+                                "
+                                stroke="currentColor"
+                                stroke-opacity="0.35"
+                              />
+
+                              <line
+                                :x1="selectedPopulationAgentGraph.padding.left"
+                                :x2="
+                                  selectedPopulationAgentGraph.width
+                                  - selectedPopulationAgentGraph.padding.right
+                                "
+                                :y1="selectedPopulationAgentGraph.thresholdY"
+                                :y2="selectedPopulationAgentGraph.thresholdY"
+                                class="text-error"
+                                stroke="currentColor"
+                                stroke-width="1"
+                                stroke-dasharray="5 5"
+                                opacity="0.7"
+                              />
+
+                              <text
+                                :x="
+                                  selectedPopulationAgentGraph.width
+                                  - selectedPopulationAgentGraph.padding.right
+                                  - 4
+                                "
+                                :y="
+                                  selectedPopulationAgentGraph.thresholdY
+                                  - 6
+                                "
+                                text-anchor="end"
+                                class="fill-error"
+                                font-size="10"
+                              >
+                                55
+                              </text>
+
+                              <polyline
+                                :points="
+                                  selectedPopulationAgentGraph.agentPolyline
+                                "
+                                fill="none"
+                                class="text-primary"
+                                stroke="currentColor"
+                                stroke-width="2"
+                              />
+
+                              <polyline
+                                :points="
+                                  selectedPopulationAgentGraph.domainPolyline
+                                "
+                                fill="none"
+                                class="text-warning"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-dasharray="7 5"
+                              />
+
+                              <polyline
+                                :points="
+                                  selectedPopulationAgentGraph.compositePolyline
+                                "
+                                fill="none"
+                                class="text-success"
+                                stroke="currentColor"
+                                stroke-width="4"
+                              />
+
+                              <g
+                                v-for="
+                                  point in selectedPopulationAgentGraph.points
+                                "
+                                :key="point.sequence"
+                              >
+                                <circle
+                                  :cx="point.x"
+                                  :cy="point.agentY"
+                                  r="4"
+                                  class="fill-primary"
+                                >
+                                  <title>
+                                    Agent Trust {{ point.agentTrustScore }}
+                                    — {{ point.label ?? point.time }}
+                                  </title>
+                                </circle>
+
+                                <circle
+                                  :cx="point.x"
+                                  :cy="point.domainY"
+                                  r="4"
+                                  class="fill-warning"
+                                >
+                                  <title>
+                                    Domain Trust {{ point.domainTrustScore }}
+                                    — {{ point.label ?? point.time }}
+                                  </title>
+                                </circle>
+
+                                <circle
+                                  :cx="point.x"
+                                  :cy="point.compositeY"
+                                  r="5"
+                                  class="fill-success"
+                                >
+                                  <title>
+                                    Composite Trust
+                                    {{ point.compositeTrustScore }}
+                                    — {{ point.label ?? point.time }}
+                                  </title>
+                                </circle>
+                              </g>
+
+                              <text
+                                :x="
+                                  selectedPopulationAgentGraph.padding.left
+                                "
+                                :y="
+                                  selectedPopulationAgentGraph.height - 12
+                                "
+                                text-anchor="start"
+                                fill="currentColor"
+                                opacity="0.65"
+                                font-size="11"
+                              >
+                                {{
+                                  selectedPopulationAgentGraph.elapsedStartLabel
+                                }}
+                              </text>
+
+                              <text
+                                :x="
+                                  selectedPopulationAgentGraph.width
+                                  - selectedPopulationAgentGraph.padding.right
+                                "
+                                :y="
+                                  selectedPopulationAgentGraph.height - 12
+                                "
+                                text-anchor="end"
+                                fill="currentColor"
+                                opacity="0.65"
+                                font-size="11"
+                              >
+                                {{
+                                  selectedPopulationAgentGraph.elapsedEndLabel
+                                }}
+                              </text>
+                            </svg>
+                          </div>
+
+                          <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                              <thead>
+                                <tr class="border-b border-default">
+                                  <th class="px-3 py-3 font-medium">
+                                    Checkpoint
+                                  </th>
+                                  <th class="px-3 py-3 font-medium">
+                                    Time
+                                  </th>
+                                  <th class="px-3 py-3 text-right font-medium">
+                                    Agent Trust
+                                  </th>
+                                  <th class="px-3 py-3 text-right font-medium">
+                                    Domain Trust
+                                  </th>
+                                  <th class="px-3 py-3 text-right font-medium">
+                                    Composite
+                                  </th>
+                                  <th class="px-3 py-3 text-right font-medium">
+                                    Decision
+                                  </th>
+                                </tr>
+                              </thead>
+
+                              <tbody>
+                                <tr
+                                  v-for="
+                                    point in selectedPopulationAgent.timeline
+                                  "
+                                  :key="point.sequence"
+                                  class="border-b border-default last:border-0"
+                                >
+                                  <td class="px-3 py-3">
+                                    <p class="font-medium">
+                                      {{
+                                        point.label
+                                        ?? `Checkpoint ${point.sequence}`
+                                      }}
+                                    </p>
+
+                                    <p class="mt-1 font-mono text-xs text-muted">
+                                      #{{ point.sequence }}
+                                    </p>
+                                  </td>
+
+                                  <td class="px-3 py-3 font-mono text-xs">
+                                    {{ point.time }}
+                                  </td>
+
+                                  <td class="px-3 py-3 text-right font-mono">
+                                    {{ point.agentTrustScore }}
+                                  </td>
+
+                                  <td class="px-3 py-3 text-right font-mono">
+                                    {{ point.domainTrustScore }}
+                                  </td>
+
+                                  <td class="px-3 py-3 text-right font-mono">
+                                    {{ point.compositeTrustScore }}
+                                  </td>
+
+                                  <td class="px-3 py-3 text-right">
+                                    <UBadge
+                                      :color="
+                                        point.allowed
+                                          ? 'success'
+                                          : 'error'
+                                      "
+                                    >
+                                      {{
+                                        point.allowed
+                                          ? 'ALLOW'
+                                          : 'DENY'
+                                      }}
+                                    </UBadge>
+
+                                    <p
+                                      v-if="point.reason"
+                                      class="mt-1 text-xs text-muted"
+                                    >
+                                      {{ point.reason }}
+                                    </p>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <p class="text-xs text-muted">
+                            Trust scores and policy decisions are authoritative
+                            simulation results returned by M2Oath Trust. Graph
+                            coordinates and connecting lines are presentation
+                            only; the Developer portal does not recalculate trust.
+                          </p>
+                        </div>
+                      </UCard>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
         </UCard>
+
       </template>
 
       <template v-if="result">
